@@ -62,7 +62,7 @@ In modern architectural engineering and BIM (Building Information Modeling) work
 - **Full Lifecycle Management**: Edit, update, resolve, and delete markup pins with threaded peer discussions.
 
 ### 5. 👥 Dual-Persona Review Workflow & Sign-Off
-- **Role Switcher**: Toggle dynamically between **Lead Architect** (Elena Rostova) and **Senior Reviewer** (Marcus Vance).
+- **Role Switcher**: Toggle dynamically between **Lead Architect** (Diwakar) and **Senior Reviewer** (Deva).
 - **Formal Sign-Off**: Reviewers can submit formal approvals (with celebratory confetti! 🎉) or request design revisions with binding commentary.
 - **Immutable Audit Trail**: All uploads, comments, markups, and status transitions append to the live audit log.
 

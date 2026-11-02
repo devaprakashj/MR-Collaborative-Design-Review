@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import Link from "next/link";
 
 export default function ProjectDetailsPage() {
@@ -386,10 +387,12 @@ export default function ProjectDetailsPage() {
                     key={c.id}
                     className="p-4 rounded-xl bg-cad-900 border border-cad-800 flex items-center gap-3.5"
                   >
-                    <img
-                      src={c.avatar}
-                      alt={c.name}
-                      className="w-11 h-11 rounded-full object-cover ring-2 ring-cad-700"
+                    <UserAvatar
+                      name={c.name}
+                      avatar={c.avatar}
+                      role={c.role}
+                      className="w-11 h-11 ring-2 ring-cad-700"
+                      textClassName="text-sm"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">

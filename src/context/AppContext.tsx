@@ -100,7 +100,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const savedUser = localStorage.getItem("mr_cdr_user");
       if (savedUser) {
-        setCurrentUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        if (parsed.name === "Elena Rostova" || parsed.id === "usr-architect-01") {
+          setCurrentUser(DEMO_USERS.architect);
+          localStorage.setItem("mr_cdr_user", JSON.stringify(DEMO_USERS.architect));
+        } else if (parsed.name === "Marcus Vance" || parsed.id === "usr-reviewer-01") {
+          setCurrentUser(DEMO_USERS.reviewer);
+          localStorage.setItem("mr_cdr_user", JSON.stringify(DEMO_USERS.reviewer));
+        } else {
+          setCurrentUser(parsed);
+        }
       }
       const savedProjects = localStorage.getItem("mr_cdr_projects");
       if (savedProjects) {

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -153,13 +154,15 @@ export function Header({ onOpenNewProject }: HeaderProps) {
                       : "hover:bg-cad-800/60"
                   }`}
                 >
-                  <div className="w-7 h-7 rounded-full bg-cyan/15 text-cyan flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    ER
-                  </div>
+                  <UserAvatar
+                    name="Diwakar"
+                    role="architect"
+                    className="w-7 h-7 text-xs mt-0.5"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-cad-100">
-                        Elena Rostova
+                        Diwakar
                       </span>
                       {currentUser.role === "architect" && (
                         <Check className="w-3.5 h-3.5 text-cyan" />
@@ -182,13 +185,15 @@ export function Header({ onOpenNewProject }: HeaderProps) {
                       : "hover:bg-cad-800/60"
                   }`}
                 >
-                  <div className="w-7 h-7 rounded-full bg-electric/20 text-electric-bright flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    MV
-                  </div>
+                  <UserAvatar
+                    name="Deva"
+                    role="reviewer"
+                    className="w-7 h-7 text-xs mt-0.5"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-cad-100">
-                        Marcus Vance
+                        Deva
                       </span>
                       {currentUser.role === "reviewer" && (
                         <Check className="w-3.5 h-3.5 text-electric-bright" />
@@ -215,12 +220,14 @@ export function Header({ onOpenNewProject }: HeaderProps) {
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-cyan" />
         </Link>
 
-        {/* User Avatar */}
+        {/* User Avatar Badge */}
         <div className="flex items-center gap-3 pl-2 border-l border-cad-800">
-          <img
-            src={currentUser.avatar}
-            alt={currentUser.name}
-            className="w-8 h-8 rounded-full object-cover ring-2 ring-cad-700"
+          <UserAvatar
+            name={currentUser.name}
+            avatar={currentUser.avatar}
+            initials={currentUser.initials}
+            role={currentUser.role}
+            className="w-8 h-8 text-xs"
           />
           <div className="hidden xl:block text-left">
             <div className="text-xs font-semibold text-cad-100 leading-tight">

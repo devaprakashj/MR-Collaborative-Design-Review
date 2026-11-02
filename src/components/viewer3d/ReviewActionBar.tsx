@@ -5,6 +5,7 @@ import { Project, ReviewAction } from "@/types";
 import { useApp } from "@/context/AppContext";
 import { CheckCircle2, AlertTriangle, XCircle, Sparkles, Send } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { Modal } from "@/components/ui/Modal";
 import { getStatusBadgeConfig } from "@/lib/utils";
 
@@ -51,12 +52,13 @@ export function ReviewActionBar({ project }: ReviewActionBarProps) {
             <span className="font-mono text-[10px]">LIVE PEERS:</span>
             <div className="flex -space-x-1.5">
               {project.collaborators.slice(0, 3).map((c) => (
-                <img
+                <UserAvatar
                   key={c.id}
-                  src={c.avatar}
-                  alt={c.name}
-                  title={`${c.name} (${c.role})`}
-                  className="w-5 h-5 rounded-full ring-2 ring-cad-900 object-cover"
+                  name={c.name}
+                  avatar={c.avatar}
+                  role={c.role}
+                  className="w-5 h-5 ring-2 ring-cad-900"
+                  textClassName="text-[8px]"
                 />
               ))}
             </div>

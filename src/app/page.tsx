@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { DEMO_USERS } from "@/lib/mockData";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import {
   Box,
   Compass,
@@ -13,8 +14,8 @@ import {
   Sparkles,
   Lock,
   Mail,
-  UserCheck,
   CheckCircle2,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -22,27 +23,42 @@ export default function LoginPage() {
   const router = useRouter();
   const { setCurrentUser, showToast } = useApp();
 
-  const [email, setEmail] = useState("elena.rostova@atelier-nord.com");
-  const [password, setPassword] = useState("••••••••••••");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [selectedDemoRole, setSelectedDemoRole] = useState<"architect" | "reviewer">("architect");
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   const handleCustomLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError("");
+
+    if (!email.trim()) {
+      setAuthError("Please enter your registered email address.");
+      return;
+    }
+    if (!password.trim()) {
+      setAuthError("Please enter your password.");
+      return;
+    }
+
     setIsLoading(true);
 
     setTimeout(() => {
-      // Pick matching or default profile
-      const user =
-        selectedDemoRole === "architect"
-          ? {
-              ...DEMO_USERS.architect,
-              email: email || DEMO_USERS.architect.email,
-            }
-          : {
-              ...DEMO_USERS.reviewer,
-              email: email || DEMO_USERS.reviewer.email,
-            };
+      const lowerEmail = email.trim().toLowerCase();
+      let user = DEMO_USERS.architect;
+
+      if (lowerEmail.includes("deva") || selectedDemoRole === "reviewer") {
+        user = {
+          ...DEMO_USERS.reviewer,
+          email: email.trim(),
+        };
+      } else {
+        user = {
+          ...DEMO_USERS.architect,
+          email: email.trim(),
+        };
+      }
 
       setCurrentUser(user);
       try {
@@ -50,19 +66,31 @@ export default function LoginPage() {
       } catch {
         // Ignore
       }
+
       showToast(
-        "Welcome to MR // Design Review",
-        `Logged in as ${user.name} (${user.title})`,
+        "Authentication Successful",
+        `Welcome, ${user.name} (${user.title})`,
         "success"
       );
       router.push("/dashboard");
-    }, 600);
+    }, 500);
+  };
+
+  const handleSelectRole = (role: "architect" | "reviewer") => {
+    setSelectedDemoRole(role);
+    setAuthError("");
+    if (role === "architect") {
+      setEmail("diwakar24281@gmail.com");
+      setPassword("password123");
+    } else {
+      setEmail("deva@mr-cdr.io");
+      setPassword("password123");
+    }
   };
 
   const handleQuickDemo = (role: "architect" | "reviewer") => {
     setSelectedDemoRole(role);
     const user = role === "architect" ? DEMO_USERS.architect : DEMO_USERS.reviewer;
-    setEmail(user.email);
     setCurrentUser(user);
     try {
       localStorage.setItem("mr_cdr_user", JSON.stringify(user));
@@ -70,8 +98,8 @@ export default function LoginPage() {
       // Ignore
     }
     showToast(
-      "Quick Demo Active",
-      `Switched to ${user.name} [${role.toUpperCase()}]`,
+      "Quick Access Activated",
+      `Logged in as ${user.name} [${role.toUpperCase()}]`,
       "info"
     );
     router.push("/dashboard");
@@ -79,7 +107,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-cad-950 flex flex-col justify-between relative overflow-hidden bg-cad-grid">
-      {/* Subtle CAD Ambient Blueprint Glow */}
+      {/* CAD Ambient Blueprint Glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-electric/10 blur-[140px] pointer-events-none rounded-full" />
       <div className="absolute bottom-0 right-0 w-[600px] h-[400px] bg-cyan/5 blur-[120px] pointer-events-none rounded-full" />
 
@@ -171,9 +199,9 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Right Login / Persona Selector Card */}
-          <div className="lg:col-span-5 bg-cad-900/90 border border-cad-750 rounded-2xl p-6 sm:p-8 shadow-cad-panel backdrop-blur-xl cad-corner-marks relative">
-            <div className="mb-6">
+          {/* Right Login Card */}
+          <div className="lg:col-span-5 bg-cad-900/95 border border-cad-750 rounded-2xl p-6 sm:p-8 shadow-cad-panel backdrop-blur-xl cad-corner-marks relative">
+            <div className="mb-5">
               <div className="text-xs font-mono uppercase text-cyan tracking-wider">
                 PORTAL AUTHENTICATION
               </div>
@@ -181,76 +209,73 @@ export default function LoginPage() {
                 Sign In to Review Space
               </h2>
               <p className="text-xs text-cad-400 mt-1">
-                Choose a demo persona or enter your credentials
+                Select an account or enter your credentials below
               </p>
             </div>
 
-            {/* Role Preset Tabs */}
-            <div className="space-y-2 mb-6">
-              <div className="text-[11px] font-mono uppercase text-cad-400">
-                Quick Demo Persona:
+            {/* Role Persona Cards */}
+            <div className="space-y-2 mb-5">
+              <div className="text-[11px] font-mono uppercase text-cad-400 flex items-center justify-between">
+                <span>Select Account Role:</span>
+                <span className="text-[10px] text-cyan-400 lowercase">click to auto-fill</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedDemoRole("architect");
-                    setEmail(DEMO_USERS.architect.email);
-                  }}
-                  className={`p-3 rounded-lg border text-left transition-all ${
+                  onClick={() => handleSelectRole("architect")}
+                  className={`p-3 rounded-xl border text-left transition-all ${
                     selectedDemoRole === "architect"
-                      ? "bg-cad-800 border-cyan text-cad-50 shadow-cyan-glow-sm"
+                      ? "bg-cad-800 border-cyan text-cad-50 shadow-cyan-glow-sm ring-1 ring-cyan/40"
                       : "bg-cad-850/60 border-cad-750 text-cad-400 hover:text-cad-200"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-xs text-cyan">
-                      ARCHITECT
-                    </span>
+                  <div className="flex items-center justify-between mb-2">
+                    <UserAvatar name="Diwakar" role="architect" className="w-6 h-6 text-[10px]" />
                     {selectedDemoRole === "architect" && (
                       <CheckCircle2 className="w-3.5 h-3.5 text-cyan" />
                     )}
                   </div>
-                  <div className="text-xs font-medium text-cad-100">
-                    Elena Rostova
+                  <div className="text-xs font-bold text-cad-100">
+                    Diwakar
                   </div>
-                  <div className="text-[10px] text-cad-400 truncate">
-                    Lead Principal
+                  <div className="text-[10px] text-cyan-400 font-mono">
+                    Lead Architect
                   </div>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedDemoRole("reviewer");
-                    setEmail(DEMO_USERS.reviewer.email);
-                  }}
-                  className={`p-3 rounded-lg border text-left transition-all ${
+                  onClick={() => handleSelectRole("reviewer")}
+                  className={`p-3 rounded-xl border text-left transition-all ${
                     selectedDemoRole === "reviewer"
-                      ? "bg-cad-800 border-electric-bright text-cad-50 shadow-blue-glow"
+                      ? "bg-cad-800 border-electric-bright text-cad-50 shadow-blue-glow ring-1 ring-electric-bright/40"
                       : "bg-cad-850/60 border-cad-750 text-cad-400 hover:text-cad-200"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-xs text-electric-bright">
-                      REVIEWER
-                    </span>
+                  <div className="flex items-center justify-between mb-2">
+                    <UserAvatar name="Deva" role="reviewer" className="w-6 h-6 text-[10px]" />
                     {selectedDemoRole === "reviewer" && (
                       <CheckCircle2 className="w-3.5 h-3.5 text-electric-bright" />
                     )}
                   </div>
-                  <div className="text-xs font-medium text-cad-100">
-                    Marcus Vance
+                  <div className="text-xs font-bold text-cad-100">
+                    Deva
                   </div>
-                  <div className="text-[10px] text-cad-400 truncate">
-                    Structural Inspector
+                  <div className="text-[10px] text-electric-bright font-mono">
+                    Senior Reviewer
                   </div>
                 </button>
               </div>
             </div>
 
             {/* Email & Password Form */}
-            <form onSubmit={handleCustomLogin} className="space-y-4">
+            <form onSubmit={handleCustomLogin} className="space-y-3.5">
+              {authError && (
+                <div className="p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-mono animate-in fade-in">
+                  {authError}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-mono uppercase text-cad-300 mb-1">
                   Email Address
@@ -261,8 +286,16 @@ export default function LoginPage() {
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-cad-850 border border-cad-700 rounded-md text-xs text-cad-100 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan/40"
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setAuthError("");
+                    }}
+                    placeholder={
+                      selectedDemoRole === "architect"
+                        ? "diwakar24281@gmail.com"
+                        : "deva@mr-cdr.io"
+                    }
+                    className="w-full pl-9 pr-3 py-2 bg-cad-850 border border-cad-700 rounded-lg text-xs text-cad-100 placeholder:text-cad-500 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan/40"
                   />
                 </div>
               </div>
@@ -270,10 +303,10 @@ export default function LoginPage() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-mono uppercase text-cad-300">
-                    Security Key / Password
+                    Password
                   </label>
-                  <span className="text-[10px] font-mono text-cyan-400">
-                    DEMO BYPASS ACTIVE
+                  <span className="text-[10px] font-mono text-cad-400">
+                    (default: password123)
                   </span>
                 </div>
                 <div className="relative">
@@ -282,37 +315,41 @@ export default function LoginPage() {
                     type="password"
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-cad-850 border border-cad-700 rounded-md text-xs text-cad-100 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan/40"
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setAuthError("");
+                    }}
+                    placeholder="Enter password"
+                    className="w-full pl-9 pr-3 py-2 bg-cad-850 border border-cad-700 rounded-lg text-xs text-cad-100 placeholder:text-cad-500 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan/40"
                   />
                 </div>
               </div>
 
-              {/* Login Button */}
+              {/* Login Submit Button */}
               <Button
                 type="submit"
-                className="w-full py-2.5 mt-2 flex items-center justify-center gap-2"
+                className="w-full py-2.5 mt-1 flex items-center justify-center gap-2"
                 isLoading={isLoading}
               >
                 <span>Enter Architectural Workspace</span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
 
-              {/* Quick One-Click Demo Direct Buttons */}
+              {/* Quick One-Click Direct Access */}
               <div className="pt-3 border-t border-cad-800 grid grid-cols-2 gap-2 text-center">
                 <button
                   type="button"
                   onClick={() => handleQuickDemo("architect")}
-                  className="py-1.5 px-2 bg-cyan/10 hover:bg-cyan/20 text-cyan border border-cyan/30 rounded text-[11px] font-mono transition-colors"
+                  className="py-1.5 px-2 bg-cyan/10 hover:bg-cyan/20 text-cyan border border-cyan/30 rounded-lg text-[11px] font-mono transition-colors"
                 >
-                  ⚡ Launch as Architect
+                  ⚡ Direct as Diwakar
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickDemo("reviewer")}
-                  className="py-1.5 px-2 bg-electric/15 hover:bg-electric/25 text-electric-bright border border-electric/30 rounded text-[11px] font-mono transition-colors"
+                  className="py-1.5 px-2 bg-electric/15 hover:bg-electric/25 text-electric-bright border border-electric/30 rounded-lg text-[11px] font-mono transition-colors"
                 >
-                  ⚡ Launch as Reviewer
+                  ⚡ Direct as Deva
                 </button>
               </div>
             </form>
@@ -332,4 +369,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

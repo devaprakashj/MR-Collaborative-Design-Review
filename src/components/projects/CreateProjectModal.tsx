@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useApp } from "@/context/AppContext";
 import { ProjectCategory } from "@/types";
 import { Building2, MapPin, Calendar, FileText, Layers } from "lucide-react";
@@ -172,10 +173,12 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
         {/* Lead Architect Attribution info */}
         <div className="p-3 bg-cad-850/60 border border-cad-800 rounded-lg flex items-center justify-between text-xs">
           <div className="flex items-center gap-2.5">
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              className="w-6 h-6 rounded-full ring-1 ring-cyan/40"
+            <UserAvatar
+              name={currentUser.name}
+              avatar={currentUser.avatar}
+              role={currentUser.role}
+              className="w-6 h-6 ring-1 ring-cyan/40"
+              textClassName="text-[9px]"
             />
             <div>
               <span className="text-cad-400">Project Principal: </span>

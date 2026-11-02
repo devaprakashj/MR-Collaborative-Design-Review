@@ -15,6 +15,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 interface ProjectCardProps {
   project: Project;
@@ -118,12 +119,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
           {/* Collaborator Avatars */}
           <div className="flex -space-x-1.5 overflow-hidden">
             {project.collaborators.slice(0, 3).map((collab) => (
-              <img
+              <UserAvatar
                 key={collab.id}
-                src={collab.avatar}
-                alt={collab.name}
-                title={`${collab.name} (${collab.role})`}
-                className="inline-block h-6 w-6 rounded-full ring-2 ring-cad-900 object-cover"
+                name={collab.name}
+                avatar={collab.avatar}
+                role={collab.role}
+                className="inline-block h-6 w-6 ring-2 ring-cad-900"
+                textClassName="text-[9px]"
               />
             ))}
             {project.collaborators.length > 3 && (

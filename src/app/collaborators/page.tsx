@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { Modal } from "@/components/ui/Modal";
 
 export default function CollaboratorsPage() {
@@ -73,10 +74,12 @@ export default function CollaboratorsPage() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3.5">
-                    <img
-                      src={c.avatar}
-                      alt={c.name}
-                      className="w-12 h-12 rounded-full object-cover ring-2 ring-cad-700"
+                    <UserAvatar
+                      name={c.name}
+                      avatar={c.avatar}
+                      role={c.role}
+                      className="w-12 h-12 ring-2 ring-cad-700"
+                      textClassName="text-base"
                     />
                     <div>
                       <h3 className="text-sm font-bold text-cad-100">{c.name}</h3>

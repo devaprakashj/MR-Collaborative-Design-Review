@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 interface AnnotationPanelProps {
   project: Project;
@@ -418,10 +419,12 @@ export function AnnotationPanel({
             {/* Author info */}
             <div className="flex items-center justify-between text-[11px] text-cad-400 pt-1">
               <div className="flex items-center gap-2">
-                <img
-                  src={activeAnnotation.author.avatar}
-                  alt={activeAnnotation.author.name}
-                  className="w-5 h-5 rounded-full object-cover"
+                <UserAvatar
+                  name={activeAnnotation.author.name}
+                  avatar={activeAnnotation.author.avatar}
+                  role={activeAnnotation.author.role}
+                  className="w-5 h-5"
+                  textClassName="text-[8px]"
                 />
                 <span>{activeAnnotation.author.name}</span>
               </div>
