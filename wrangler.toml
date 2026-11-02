@@ -2,3 +2,9 @@ name = "mr-collaborative-design-review"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "out"
 
+[build]
+command = "npm run build"
+
+[assets]
+directory = "./out"
+not_found_handling = "single-page-application"
