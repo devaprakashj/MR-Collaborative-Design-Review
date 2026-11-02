@@ -18,6 +18,11 @@ import {
   Upload,
   RefreshCw,
   Compass,
+  Scissors,
+  Play,
+  Pause,
+  Ruler,
+  X,
 } from "lucide-react";
 import { CameraPresetView } from "./ArchitecturalScene";
 
@@ -48,6 +53,19 @@ interface ViewportControlsProps {
   isCustomModel: boolean;
   onOpenUpload: () => void;
   onResetModel: () => void;
+  // Section Cut (Clipping Plane)
+  isSectionCut?: boolean;
+  onToggleSectionCut?: () => void;
+  sectionCutHeight?: number;
+  onChangeSectionCutHeight?: (val: number) => void;
+  // Turntable Auto-Rotate Presentation
+  autoRotate?: boolean;
+  onToggleAutoRotate?: () => void;
+  // 3D Laser Measurement
+  isMeasuring?: boolean;
+  onToggleMeasuring?: () => void;
+  measuredDistance?: number | null;
+  onClearMeasurement?: () => void;
 }
 
 export function ViewportControls({
@@ -74,6 +92,16 @@ export function ViewportControls({
   isCustomModel,
   onOpenUpload,
   onResetModel,
+  isSectionCut = false,
+  onToggleSectionCut,
+  sectionCutHeight = 100,
+  onChangeSectionCutHeight,
+  autoRotate = false,
+  onToggleAutoRotate,
+  isMeasuring = false,
+  onToggleMeasuring,
+  measuredDistance = null,
+  onClearMeasurement,
 }: ViewportControlsProps) {
   const [showLightingMenu, setShowLightingMenu] = useState(false);
 
@@ -181,7 +209,7 @@ export function ViewportControls({
 
         <div className="w-px h-5 bg-cad-800 mx-1 hidden sm:block" />
 
-        {/* Visualization Toggles: Wireframe, Explode, Grid */}
+        {/* Unity-Grade CAD Tools: Wireframe, Explode, Section Cut, Turntable, Measure */}
         <div className="flex items-center gap-1">
           <button
             onClick={onToggleWireframe}
@@ -206,6 +234,55 @@ export function ViewportControls({
           >
             <Layers className="w-3.5 h-3.5" />
           </button>
+
+          {/* Section Cut Tool */}
+          {onToggleSectionCut && (
+            <button
+              onClick={onToggleSectionCut}
+              className={`p-1.5 rounded-lg text-xs transition-colors border ${
+                isSectionCut
+                  ? "bg-amber-500 text-cad-950 font-bold border-amber-500 shadow-md"
+                  : "text-cad-300 hover:text-white bg-cad-850/50 border-cad-800"
+              }`}
+              title="Toggle Live Section Box / Floor Cutting Plane"
+            >
+              <Scissors className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* 3D Laser Measure Tool */}
+          {onToggleMeasuring && (
+            <button
+              onClick={onToggleMeasuring}
+              className={`p-1.5 rounded-lg text-xs transition-colors border ${
+                isMeasuring
+                  ? "bg-emerald-500 text-cad-950 font-bold border-emerald-500 shadow-md animate-pulse"
+                  : "text-cad-300 hover:text-white bg-cad-850/50 border-cad-800"
+              }`}
+              title="Laser Distance Measurement (Click 2 points)"
+            >
+              <Ruler className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Presentation Turntable Auto-Rotate Mode */}
+          {onToggleAutoRotate && (
+            <button
+              onClick={onToggleAutoRotate}
+              className={`p-1.5 rounded-lg text-xs transition-colors border ${
+                autoRotate
+                  ? "bg-cyan text-cad-950 font-bold border-cyan shadow-lg"
+                  : "text-cad-300 hover:text-white bg-cad-850/50 border-cad-800"
+              }`}
+              title="Cinematic Presentation Turntable (Auto-Rotate)"
+            >
+              {autoRotate ? (
+                <Pause className="w-3.5 h-3.5" />
+              ) : (
+                <Play className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
 
           <button
             onClick={onToggleGrid}
@@ -251,7 +328,7 @@ export function ViewportControls({
                           : "bg-cad-850 text-cad-300 hover:text-white"
                       }`}
                     >
-                      {mode}
+                      {mode === "dusk" ? "Sunset" : mode}
                     </button>
                   ))}
                 </div>
@@ -313,6 +390,65 @@ export function ViewportControls({
           </button>
         </div>
       </div>
+
+      {/* Floating Section Box Cut Elevation Slider */}
+      {isSectionCut && onChangeSectionCutHeight && (
+        <div className="flex items-center gap-3 bg-cad-900/95 backdrop-blur-md border border-amber-500/50 rounded-xl px-3.5 py-2 shadow-2xl text-xs font-mono w-fit animate-in fade-in">
+          <div className="flex items-center gap-1.5 text-amber-400 font-bold">
+            <Scissors className="w-3.5 h-3.5" />
+            <span>SECTION CUT:</span>
+          </div>
+          <input
+            type="range"
+            min={10}
+            max={100}
+            value={sectionCutHeight}
+            onChange={(e) => onChangeSectionCutHeight(Number(e.target.value))}
+            className="w-40 accent-amber-400 bg-cad-800 h-1.5 rounded cursor-pointer"
+          />
+          <span className="text-amber-300 min-w-[42px] font-bold">
+            {sectionCutHeight === 100 ? "FULL" : `${sectionCutHeight}%`}
+          </span>
+          <button
+            onClick={onToggleSectionCut}
+            className="text-cad-400 hover:text-white p-0.5 rounded"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Floating 3D Measurement Distance Readout */}
+      {isMeasuring && (
+        <div className="flex items-center gap-2.5 bg-emerald-950/90 backdrop-blur-md border border-emerald-500/60 rounded-xl px-3.5 py-1.5 shadow-2xl text-xs font-mono text-emerald-300 animate-in fade-in">
+          <Ruler className="w-3.5 h-3.5 text-emerald-400" />
+          {measuredDistance !== null ? (
+            <div className="flex items-center gap-2">
+              <span className="text-white font-bold">
+                MEASURED SPAN: {measuredDistance.toFixed(2)} m ({Math.round(measuredDistance * 1000)} mm)
+              </span>
+              {onClearMeasurement && (
+                <button
+                  onClick={onClearMeasurement}
+                  className="px-1.5 py-0.5 bg-emerald-800/60 hover:bg-emerald-700 text-white rounded text-[10px]"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          ) : (
+            <span>Click Point A, then Point B on the building surface to measure span</span>
+          )}
+        </div>
+      )}
+
+      {/* Auto-Rotate Turntable Active Pill */}
+      {autoRotate && (
+        <div className="flex items-center gap-2 bg-cyan/15 backdrop-blur-md border border-cyan/40 text-cyan rounded-lg px-3 py-1 text-[11px] font-mono w-fit animate-pulse">
+          <Play className="w-3 h-3 fill-cyan" />
+          <span>CINEMATIC PRESENTATION TURNTABLE ACTIVE</span>
+        </div>
+      )}
 
       {/* Helper Banner when Pin Mode is Active */}
       {isAddingAnnotation && (

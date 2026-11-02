@@ -104,7 +104,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       const savedProjects = localStorage.getItem("mr_cdr_projects");
       if (savedProjects) {
-        setProjects(JSON.parse(savedProjects));
+        const parsed = JSON.parse(savedProjects);
+        const existingIds = new Set(parsed.map((p: Project) => p.id));
+        const merged = [...parsed, ...INITIAL_PROJECTS.filter((p) => !existingIds.has(p.id))];
+        setProjects(merged);
       }
       const savedAnnotations = localStorage.getItem("mr_cdr_annotations");
       if (savedAnnotations) {

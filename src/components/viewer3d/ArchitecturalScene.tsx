@@ -9,11 +9,12 @@ import {
   Html,
   Environment,
   ContactShadows,
+  Line,
 } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { Annotation, ProjectCategory } from "@/types";
+import { Annotation, ProjectCategory, BimElementData } from "@/types";
 
 export type CameraPresetView = "perspective" | "top" | "front" | "side";
 
@@ -41,6 +42,14 @@ interface ArchitecturalSceneProps {
   focusPosition?: [number, number, number] | null;
   onModelLoaded?: (stats: { meshCount: number; vertexCount: number; materialsCount: number; boundingBox: [number, number, number] }) => void;
   onModelError?: (errorMsg: string) => void;
+  // Unity-Grade Upgrades
+  autoRotate?: boolean;
+  isSectionCut?: boolean;
+  sectionCutHeight?: number; // 10 to 100
+  isMeasuring?: boolean;
+  onMeasuredDistance?: (distance: number | null) => void;
+  onSelectBimElement?: (element: BimElementData) => void;
+  selectedElementId?: string | null;
 }
 
 // -------------------------------------------------------------
@@ -58,82 +67,63 @@ function AnnotationPin({
   const [hovered, setHovered] = useState(false);
   const beaconRef = useRef<THREE.Mesh>(null);
 
-  useFrame((state) => {
+  useFrame((_, delta) => {
     if (beaconRef.current) {
-      beaconRef.current.position.y =
-        0.55 + Math.sin(state.clock.elapsedTime * 3.5) * 0.05;
+      beaconRef.current.rotation.y += delta * 1.5;
     }
   });
 
-  const priorityColor =
-    annotation.priority === "critical"
-      ? "#EF4444"
-      : annotation.priority === "high"
-      ? "#F59E0B"
-      : annotation.priority === "medium"
-      ? "#06B6D4"
-      : "#10B981";
+  const colorMap = {
+    critical: "#EF4444",
+    high: "#F59E0B",
+    medium: "#00F0FF",
+    low: "#10B981",
+  };
+  const color = colorMap[annotation.priority] || "#00F0FF";
 
   return (
     <group position={annotation.position}>
-      {/* Ground Contact Target Ring */}
-      <mesh position={[0, 0.04, 0]}>
-        <cylinderGeometry args={[0.1, 0.02, 0.08, 16]} />
-        <meshBasicMaterial color={priorityColor} />
-      </mesh>
-
-      {/* Vertical Pin Needle */}
-      <mesh position={[0, 0.32, 0]}>
-        <cylinderGeometry args={[0.015, 0.015, 0.55, 8]} />
-        <meshBasicMaterial color={isSelected || hovered ? "#FFFFFF" : priorityColor} />
-      </mesh>
-
-      {/* Floating Glowing Beacon */}
-      <mesh
-        ref={beaconRef}
-        position={[0, 0.6, 0]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick();
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHovered(true);
-        }}
-        onPointerOut={() => setHovered(false)}
-      >
-        <sphereGeometry args={[0.16, 16, 16]} />
+      {/* Anchor Point Sphere */}
+      <mesh onClick={(e) => { e.stopPropagation(); onClick(); }} onPointerOver={() => setHovered(true)} onPointerOut={() => setHovered(false)}>
+        <sphereGeometry args={[0.22, 16, 16]} />
         <meshStandardMaterial
-          color={priorityColor}
-          emissive={priorityColor}
-          emissiveIntensity={isSelected || hovered ? 1.0 : 0.6}
+          color={color}
+          emissive={color}
+          emissiveIntensity={isSelected ? 0.9 : 0.4}
           roughness={0.2}
+          metalness={0.8}
         />
       </mesh>
 
-      {/* Refined Callout Badge */}
-      <Html distanceFactor={14} position={[0, 0.82, 0]} center>
+      {/* Pulsing Beacon Ring */}
+      <mesh ref={beaconRef} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.3, 0.45, 24]} />
+        <meshBasicMaterial
+          color={color}
+          side={THREE.DoubleSide}
+          transparent
+          opacity={isSelected ? 0.85 : 0.4}
+        />
+      </mesh>
+
+      {/* Floating CAD Tag */}
+      <Html distanceFactor={14} position={[0, 0.55, 0]} center zIndexRange={[100, 0]}>
         <div
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-          }}
-          className={`cursor-pointer group flex items-center gap-1.5 px-2.5 py-1 rounded-full border backdrop-blur-md transition-all select-none shadow-xl ${
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
+          className={`cursor-pointer transition-all duration-200 select-none flex items-center gap-1.5 px-2 py-1 rounded-md border font-mono text-[11px] whitespace-nowrap shadow-xl backdrop-blur-md ${
             isSelected
-              ? "bg-cad-900 border-cyan text-white shadow-cyan-glow scale-110 ring-2 ring-cyan/40"
+              ? "bg-cad-900/95 border-cyan text-cyan font-bold scale-110 ring-2 ring-cyan/40"
               : hovered
-              ? "bg-cad-900/95 border-cad-600 text-cad-100 scale-105"
-              : "bg-cad-950/85 border-cad-750 text-cad-300"
+              ? "bg-cad-900/90 border-cad-600 text-cad-100 scale-105"
+              : "bg-cad-950/75 border-cad-800 text-cad-300"
           }`}
         >
           <span
-            className="w-2 h-2 rounded-full shrink-0 animate-pulse"
-            style={{ backgroundColor: priorityColor }}
+            className="w-2 h-2 rounded-full shrink-0 shadow-sm"
+            style={{ backgroundColor: color }}
           />
-          <span className="text-[10px] font-mono font-medium max-w-[130px] truncate">
-            {annotation.title}
-          </span>
-          <span className="text-[8px] font-mono text-cad-400 uppercase px-1 py-0.2 rounded bg-cad-800">
+          <span className="truncate max-w-[170px]">{annotation.title}</span>
+          <span className="text-[9px] uppercase px-1 py-0.2 bg-cad-800/80 rounded border border-cad-700/60 font-semibold opacity-75">
             {annotation.priority.slice(0, 4)}
           </span>
         </div>
@@ -143,114 +133,202 @@ function AnnotationPin({
 }
 
 // -------------------------------------------------------------
+// Interactive 3D Laser Measurement Line Component
+// -------------------------------------------------------------
+function MeasurementLaserLine({
+  start,
+  end,
+}: {
+  start: [number, number, number];
+  end: [number, number, number];
+}) {
+  const distance = useMemo(() => {
+    const v1 = new THREE.Vector3(...start);
+    const v2 = new THREE.Vector3(...end);
+    return v1.distanceTo(v2);
+  }, [start, end]);
+
+  const midpoint: [number, number, number] = [
+    (start[0] + end[0]) / 2,
+    (start[1] + end[1]) / 2 + 0.35,
+    (start[2] + end[2]) / 2,
+  ];
+
+  return (
+    <group>
+      <Line points={[start, end]} color="#10B981" lineWidth={3.5} />
+      {/* End Point Pulsing Markers */}
+      <mesh position={start}>
+        <sphereGeometry args={[0.16, 16, 16]} />
+        <meshBasicMaterial color="#10B981" />
+      </mesh>
+      <mesh position={end}>
+        <sphereGeometry args={[0.16, 16, 16]} />
+        <meshBasicMaterial color="#10B981" />
+      </mesh>
+      {/* Dynamic 3D Tag */}
+      <Html position={midpoint} center distanceFactor={16} zIndexRange={[120, 0]}>
+        <div className="bg-emerald-950/95 text-emerald-200 border border-emerald-400 font-mono text-xs px-2.5 py-1 rounded-lg shadow-2xl flex items-center gap-1.5 whitespace-nowrap backdrop-blur-md pointer-events-none select-none font-bold ring-2 ring-emerald-500/20">
+          <span className="text-emerald-400">⟷</span>
+          <span>{distance.toFixed(2)} m</span>
+          <span className="text-[10px] text-emerald-400/80">({Math.round(distance * 1000)} mm)</span>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+// -------------------------------------------------------------
 // 1. MODEL: NORDIC HORIZON CULTURAL FORUM (Cultural & Museum)
 // -------------------------------------------------------------
-function NordicCulturalForum({ wireframe, exploded }: { wireframe: boolean; exploded: boolean }) {
-  const explodeFactor = exploded ? 1.55 : 1.0;
+function NordicCulturalForum({
+  wireframe,
+  exploded,
+  sectionHeight = 100,
+  onSelectElement,
+}: {
+  wireframe: boolean;
+  exploded: boolean;
+  sectionHeight?: number;
+  onSelectElement?: (el: BimElementData) => void;
+}) {
+  const explodeFactor = exploded ? 1.5 : 1.0;
+  const isCut = sectionHeight < 95;
 
   const mats = useMemo(() => ({
-    limestone: new THREE.MeshStandardMaterial({ color: "#E2E8F0", roughness: 0.85, metalness: 0.05, wireframe }),
-    concrete: new THREE.MeshStandardMaterial({ color: "#64748B", roughness: 0.75, metalness: 0.1, wireframe }),
-    paving: new THREE.MeshStandardMaterial({ color: "#334155", roughness: 0.8, wireframe }),
-    slabs: new THREE.MeshStandardMaterial({ color: "#475569", roughness: 0.6, wireframe }),
-    edgeMetal: new THREE.MeshStandardMaterial({ color: "#1E293B", metalness: 0.8, roughness: 0.3, wireframe }),
-    timber: new THREE.MeshStandardMaterial({ color: "#D97706", roughness: 0.45, metalness: 0.05, wireframe }),
-    timberDeck: new THREE.MeshStandardMaterial({ color: "#B45309", roughness: 0.65, wireframe }),
-    glass: new THREE.MeshPhysicalMaterial({ color: "#FFFFFF", transparent: true, opacity: wireframe ? 0.95 : 0.22, roughness: 0.03, transmission: 0.94, thickness: 0.6, ior: 1.52, wireframe }),
-    mullions: new THREE.MeshStandardMaterial({ color: "#0F172A", metalness: 0.85, roughness: 0.2, wireframe }),
-    steel: new THREE.MeshStandardMaterial({ color: "#CBD5E1", metalness: 0.95, roughness: 0.15, wireframe }),
-    galvDuct: new THREE.MeshStandardMaterial({ color: "#CBD5E1", metalness: 0.85, roughness: 0.25, wireframe }),
-    balustrade: new THREE.MeshPhysicalMaterial({ color: "#F1F5F9", transparent: true, opacity: wireframe ? 0.9 : 0.35, roughness: 0.05, transmission: 0.9, thickness: 0.25, wireframe }),
-    lawn: new THREE.MeshStandardMaterial({ color: "#16A34A", roughness: 0.9, wireframe }),
-    hedge: new THREE.MeshStandardMaterial({ color: "#15803D", roughness: 0.85, wireframe }),
-    woodFloor: new THREE.MeshStandardMaterial({ color: "#E2BA86", roughness: 0.4, wireframe }),
+    slabs: new THREE.MeshStandardMaterial({ color: "#E2E8F0", roughness: 0.85, metalness: 0.05, wireframe }),
+    glass: new THREE.MeshPhysicalMaterial({ color: "#E0F2FE", transparent: true, opacity: wireframe ? 0.9 : 0.35, roughness: 0.05, transmission: 0.9, thickness: 0.6, ior: 1.52, wireframe }),
+    timber: new THREE.MeshStandardMaterial({ color: "#D97706", roughness: 0.5, metalness: 0.1, wireframe }),
+    darkTimber: new THREE.MeshStandardMaterial({ color: "#78350F", roughness: 0.6, metalness: 0.1, wireframe }),
+    limestone: new THREE.MeshStandardMaterial({ color: "#CBD5E1", roughness: 0.9, wireframe }),
+    galvDuct: new THREE.MeshStandardMaterial({ color: "#94A3B8", metalness: 0.85, roughness: 0.25, wireframe }),
+    lawn: new THREE.MeshStandardMaterial({ color: "#15803D", roughness: 0.9, wireframe }),
+    balustrade: new THREE.MeshPhysicalMaterial({ color: "#BAE6FD", transparent: true, opacity: 0.45, roughness: 0.05, transmission: 0.9, thickness: 0.2, wireframe }),
+    blackSteel: new THREE.MeshStandardMaterial({ color: "#0F172A", metalness: 0.9, roughness: 0.2, wireframe }),
   }), [wireframe]);
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Plaza & Stepped Approach */}
-      <mesh position={[0, 0.1, 0]} material={mats.paving} receiveShadow>
-        <boxGeometry args={[16, 0.2, 13]} />
-      </mesh>
-      {[0, 1, 2, 3, 4].map((step) => (
-        <mesh key={`step-${step}`} position={[0, 0.04 + step * 0.06, 6.6 + step * 0.4]} material={mats.paving} receiveShadow>
-          <boxGeometry args={[7.2 - step * 0.2, 0.06, 0.45]} />
+      {/* Ground Podium & Granite Steps */}
+      <group position={[0, 0.1, 0]}>
+        <mesh position={[0, 0, 0]} material={mats.slabs} receiveShadow>
+          <boxGeometry args={[16.5, 0.2, 13.5]} />
         </mesh>
-      ))}
-      {[-7.2, 7.2].map((x) => (
-        <group key={`plaza-planter-${x}`} position={[x, 0.35, 0]}>
-          <mesh material={mats.limestone} castShadow receiveShadow><boxGeometry args={[1.0, 0.5, 10.5]} /></mesh>
-          <mesh position={[0, 0.32, 0]} material={mats.hedge} castShadow><boxGeometry args={[0.8, 0.22, 10.3]} /></mesh>
-        </group>
-      ))}
-
-      {/* Concrete Core */}
-      <group position={[-2.4, 4.4 * explodeFactor, -1.2]}>
-        <mesh material={mats.concrete} castShadow receiveShadow><boxGeometry args={[2.8, 8.8 * explodeFactor, 2.6]} /></mesh>
+        <mesh position={[0, -0.05, 7.2]} material={mats.limestone} receiveShadow>
+          <boxGeometry args={[7.2, 0.1, 1.2]} />
+        </mesh>
       </group>
 
-      {/* L1 Double-Height Atrium */}
-      <group position={[0, 0.2 * explodeFactor, 0]}>
-        <mesh position={[0, 0.02, 0]} material={mats.woodFloor} receiveShadow><boxGeometry args={[12.8, 0.04, 9.8]} /></mesh>
-        {[-4.6, -1.6, 1.6, 4.6].map((x) =>
-          [-3.4, 0, 3.4].map((z) => (
-            <mesh key={`col-l1-${x}-${z}`} position={[x, 1.4, z]} material={mats.timber} castShadow>
-              <cylinderGeometry args={[0.13, 0.13, 2.7, 16]} />
-            </mesh>
-          ))
-        )}
-        <mesh position={[0, 1.4, 0]} material={mats.glass}><boxGeometry args={[13.0, 2.7, 10.0]} /></mesh>
-        {[-6.5, -3.7, -0.9, 0.9, 3.7, 6.5].map((x) => (
-          <mesh key={`mullion-${x}`} position={[x, 1.4, 5.01]} material={mats.mullions}><boxGeometry args={[0.05, 2.7, 0.08]} /></mesh>
-        ))}
+      {/* L1 Level Glass Atrium */}
+      <group
+        position={[0, 1.45 * explodeFactor, 0]}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onSelectElement?.({
+            id: "CW-L1-01",
+            name: "L1 Double-Skin Atrium Glazing CW-L1-01",
+            ifcType: "IfcCurtainWall",
+            material: "Low-E Argon Insulated Glass Unit (12+16+12mm)",
+            dimensions: "14.2m × 2.6m × 0.14m",
+            fireRating: "REI 60 (60 Mins)",
+            thermalTransmittance: "U = 0.82 W/m²K",
+            structuralLoad: "2.8 kN/m² Wind Pressure Resistance",
+            clashStatus: "clear",
+            manufacturer: "Saint-Gobain Glass Solutions",
+          });
+        }}
+      >
+        <mesh position={[0, 0, 0]} material={mats.glass}>
+          <boxGeometry args={[14.2, 2.6 * explodeFactor, 11.2]} />
+        </mesh>
+        {/* Entrance Revolving Door */}
+        <mesh position={[0, -0.2, 5.65]} material={mats.blackSteel} castShadow>
+          <cylinderGeometry args={[1.0, 1.0, 2.2, 24]} />
+        </mesh>
       </group>
 
-      {/* L2 Mezzanine with Sun Louvers */}
-      <group position={[0, 2.9 * explodeFactor, 0]}>
-        <mesh position={[0, 0, 0]} material={mats.slabs} castShadow receiveShadow><boxGeometry args={[13.2, 0.32, 10.2]} /></mesh>
-        <mesh position={[0, 1.15, 0]} material={mats.glass}><boxGeometry args={[12.6, 2.1, 9.6]} /></mesh>
-        {[-6.2, -5.4, -4.6, -3.8, -3.0].map((x) => (
-          <mesh key={`louver-${x}`} position={[x, 1.15, 4.95]} rotation={[0, 0.35, 0]} material={mats.timber} castShadow>
-            <boxGeometry args={[0.06, 2.1, 0.32]} />
+      {/* L2 Mezzanine Slab */}
+      <group position={[0, 2.85 * explodeFactor, 0]}>
+        <mesh material={mats.slabs} castShadow receiveShadow>
+          <boxGeometry args={[14.8, 0.28, 11.8]} />
+        </mesh>
+      </group>
+
+      {/* L3 Cantilevered Observation Gallery & Terrace */}
+      {(!isCut || sectionHeight > 35) && (
+        <group
+          position={[0, 4.3 * explodeFactor, 0]}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onSelectElement?.({
+              id: "TR-L3-04",
+              name: "Level 3 Cantilevered Glulam Observation Gallery",
+              ifcType: "IfcBeam",
+              material: "European Spruce Glued Laminated Timber GL28c",
+              dimensions: "4.4m Overhang × 5.2m Width",
+              fireRating: "R 90 Fire Resisting Timber",
+              structuralLoad: "5.0 kN/m² Live Commercial Terrace Load",
+              clashStatus: "clear",
+              manufacturer: "Rubner Holzbau Engineering",
+            });
+          }}
+        >
+          <mesh position={[2.2, 0, 0]} material={mats.slabs} castShadow receiveShadow>
+            <boxGeometry args={[12.6, 0.28, 11.2]} />
           </mesh>
-        ))}
-      </group>
-
-      {/* L3 Cantilevered Observation Deck */}
-      <group position={[0, 5.2 * explodeFactor, 0]}>
-        <mesh position={[-1.2, 0, 0]} material={mats.slabs} castShadow receiveShadow><boxGeometry args={[10.6, 0.35, 9.8]} /></mesh>
-        {/* Cantilever Deck */}
-        <group position={[4.6, 0, 0.8]}>
-          <mesh position={[0, 0.08, 0]} material={mats.timberDeck} castShadow receiveShadow><boxGeometry args={[4.4, 0.14, 5.2]} /></mesh>
-          {[-2.0, 0, 2.0].map((z) => (
-            <mesh key={`outrigger-${z}`} position={[-0.6, -0.32, z]} material={mats.edgeMetal} castShadow><boxGeometry args={[3.2, 0.48, 0.14]} /></mesh>
-          ))}
-          <mesh position={[2.18, 0.6, 0]} material={mats.balustrade}><boxGeometry args={[0.04, 1.0, 5.2]} /></mesh>
-          <mesh position={[0, 0.6, 2.58]} material={mats.balustrade}><boxGeometry args={[4.36, 1.0, 0.04]} /></mesh>
-          <mesh position={[0, 0.6, -2.58]} material={mats.balustrade}><boxGeometry args={[4.36, 1.0, 0.04]} /></mesh>
+          <mesh position={[-1.2, 1.25, 0]} material={mats.glass}>
+            <boxGeometry args={[10.2, 2.3, 9.4]} />
+          </mesh>
         </group>
-        <mesh position={[-1.2, 1.25, 0]} material={mats.glass}><boxGeometry args={[10.2, 2.3, 9.4]} /></mesh>
-      </group>
+      )}
 
-      {/* L4 Green Roof Lawn & Pergola */}
-      <group position={[0, 7.6 * explodeFactor, 0]}>
-        <mesh position={[0, 0, 0]} material={mats.slabs} castShadow receiveShadow><boxGeometry args={[13.4, 0.32, 10.4]} /></mesh>
-        <mesh position={[-1.5, 0.18, 0]} material={mats.lawn} receiveShadow><boxGeometry args={[8.8, 0.06, 9.4]} /></mesh>
-        {/* Pergola */}
-        <group position={[3.6, 1.4, 0]}>
-          {[-1.6, -0.8, 0, 0.8, 1.6].map((x) => (
-            <mesh key={`rafter-${x}`} position={[x, 0.1, 0]} material={mats.timber} castShadow><boxGeometry args={[0.08, 0.22, 4.0]} /></mesh>
-          ))}
+      {/* L4 Green Roof Lawn & Timber Pergola */}
+      {(!isCut || sectionHeight > 70) && (
+        <group position={[0, 7.6 * explodeFactor, 0]}>
+          <mesh position={[0, 0, 0]} material={mats.slabs} castShadow receiveShadow>
+            <boxGeometry args={[13.4, 0.32, 10.4]} />
+          </mesh>
+          <mesh position={[-1.5, 0.18, 0]} material={mats.lawn} receiveShadow>
+            <boxGeometry args={[8.8, 0.06, 9.4]} />
+          </mesh>
+          <group position={[3.6, 1.4, 0]}>
+            {[-1.6, -0.8, 0, 0.8, 1.6].map((x) => (
+              <mesh key={`rafter-${x}`} position={[x, 0.1, 0]} material={mats.timber} castShadow>
+                <boxGeometry args={[0.08, 0.22, 4.0]} />
+              </mesh>
+            ))}
+          </group>
         </group>
-      </group>
+      )}
 
       {/* Visible MEP Duct Collision at Grid E-4 */}
-      <group position={[1.8, 3.4 * explodeFactor, -0.6]}>
-        <mesh material={mats.galvDuct} castShadow><boxGeometry args={[4.6, 0.65, 0.8]} /></mesh>
+      <group
+        position={[1.8, 3.4 * explodeFactor, -0.6]}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onSelectElement?.({
+            id: "MEP-CLASH-E4",
+            name: "MEP Atrium Fresh Air Duct & Glulam Cross-Truss Conflict",
+            ifcType: "IfcDuctSegment",
+            material: "650mm Spiral Galvanized Steel vs Glulam Timber",
+            dimensions: "650mm ⌀ Duct intersecting 350×650mm Timber Beam",
+            fireRating: "Class 0 Non-Combustible",
+            clashStatus: "conflict",
+            structuralLoad: "Collision: 300mm Clearance Required",
+            manufacturer: "Lindab Ventilation & Atelier Nord",
+          });
+        }}
+      >
+        <mesh material={mats.galvDuct} castShadow>
+          <boxGeometry args={[4.6, 0.65, 0.8]} />
+        </mesh>
         <mesh position={[0, 0, 0]} rotation={[0.32, 0.2, 0.62]} material={mats.timber} castShadow>
           <boxGeometry args={[0.26, 1.9, 0.26]} />
         </mesh>
-        <mesh position={[0, 0, 0]}><boxGeometry args={[1.1, 0.9, 1.1]} /><meshBasicMaterial color="#EF4444" wireframe opacity={0.65} transparent /></mesh>
+        <mesh position={[0, 0, 0]}>
+          <boxGeometry args={[1.1, 0.9, 1.1]} />
+          <meshBasicMaterial color="#EF4444" wireframe opacity={0.75} transparent />
+        </mesh>
       </group>
     </group>
   );
@@ -258,11 +336,21 @@ function NordicCulturalForum({ wireframe, exploded }: { wireframe: boolean; expl
 
 // -------------------------------------------------------------
 // 2. MODEL: VERTEX BIOPHILIC MIXED-USE TOWER (Commercial High-Rise)
-// Soaring multi-tier skyscraper with spiraling sky-gardens, curved
-// aerodynamic glass facade, titanium structural exoskeleton & crown
 // -------------------------------------------------------------
-function VertexBiophilicTower({ wireframe, exploded }: { wireframe: boolean; exploded: boolean }) {
+function VertexBiophilicTower({
+  wireframe,
+  exploded,
+  sectionHeight = 100,
+  onSelectElement,
+}: {
+  wireframe: boolean;
+  exploded: boolean;
+  sectionHeight?: number;
+  onSelectElement?: (el: BimElementData) => void;
+}) {
   const explodeFactor = exploded ? 1.4 : 1.0;
+  const maxLevels = Math.max(2, Math.round((sectionHeight / 100) * 16));
+  const floorLevels = Array.from({ length: maxLevels }, (_, i) => i);
 
   const mats = useMemo(() => ({
     towerGlass: new THREE.MeshPhysicalMaterial({ color: "#BAE6FD", transparent: true, opacity: wireframe ? 0.95 : 0.25, roughness: 0.04, transmission: 0.92, thickness: 0.8, ior: 1.52, wireframe }),
@@ -274,9 +362,6 @@ function VertexBiophilicTower({ wireframe, exploded }: { wireframe: boolean; exp
     crownGlow: new THREE.MeshStandardMaterial({ color: "#00F0FF", emissive: "#00F0FF", emissiveIntensity: 0.8, roughness: 0.1 }),
     paving: new THREE.MeshStandardMaterial({ color: "#0F172A", roughness: 0.9, wireframe }),
   }), [wireframe]);
-
-  // Tower Tier Configuration (Height ~ 16 units)
-  const floorLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
   return (
     <group position={[0, 0, 0]}>
@@ -292,33 +377,42 @@ function VertexBiophilicTower({ wireframe, exploded }: { wireframe: boolean; exp
         <mesh position={[0, 0, 0]} material={mats.towerGlass}>
           <boxGeometry args={[11.2, 2.1, 11.2]} />
         </mesh>
-        {/* Entrance Double-Height Canopy */}
-        <mesh position={[0, 0.4, 6.2]} material={mats.titaniumSpandrel} castShadow>
-          <boxGeometry args={[6.5, 0.2, 2.2]} />
-        </mesh>
       </group>
 
-      {/* Main Soaring Tower Shaft (Floors 4-15) */}
+      {/* Main Soaring Tower Shaft */}
       {floorLevels.map((lvl) => {
         if (lvl < 2) return null;
         const yPos = (lvl * 0.95 + 1.2) * explodeFactor;
-        const width = 8.5 - lvl * 0.18; // Tapering profile
+        const width = 8.5 - lvl * 0.18;
         const hasSkyGarden = lvl % 3 === 0;
         const gardenSide = lvl % 6 === 0 ? 1 : -1;
 
         return (
-          <group key={`tower-fl-${lvl}`} position={[0, yPos, 0]}>
-            {/* Floor Slab Plate with Metallic Spandrel */}
+          <group
+            key={`tower-fl-${lvl}`}
+            position={[0, yPos, 0]}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onSelectElement?.({
+                id: `CW-TOWER-FL${lvl}`,
+                name: `Level ${lvl} Aerodynamic Curtain Wall & Mega-Column Axis`,
+                ifcType: "IfcCurtainWall",
+                material: "Triple-Glazed Solar Control Low-E + Anodized Titanium",
+                dimensions: `${width.toFixed(1)}m × ${width.toFixed(1)}m × 3.6m Floor Height`,
+                fireRating: "REI 120 (2 Hours)",
+                thermalTransmittance: "U = 0.78 W/m²K",
+                structuralLoad: "32.0 MN Axial Column Load",
+                clashStatus: "clear",
+                manufacturer: "Schüco International Facades",
+              });
+            }}
+          >
             <mesh material={mats.titaniumSpandrel} castShadow>
               <boxGeometry args={[width + 0.3, 0.18, width + 0.3]} />
             </mesh>
-
-            {/* Facade Glass Curtain */}
             <mesh position={[0, 0.45 * explodeFactor, 0]} material={mats.towerGlass}>
               <boxGeometry args={[width, 0.88 * explodeFactor, width]} />
             </mesh>
-
-            {/* Corner Structural Mega-Columns */}
             {[-1, 1].map((sx) =>
               [-1, 1].map((sz) => (
                 <mesh
@@ -331,8 +425,6 @@ function VertexBiophilicTower({ wireframe, exploded }: { wireframe: boolean; exp
                 </mesh>
               ))
             )}
-
-            {/* Spiraling Biophilic Sky Gardens (Cutouts on alternating floors) */}
             {hasSkyGarden && (
               <group position={[(width / 2 + 0.8) * gardenSide, 0.05, 0]}>
                 <mesh material={mats.terraceWood} castShadow>
@@ -341,35 +433,43 @@ function VertexBiophilicTower({ wireframe, exploded }: { wireframe: boolean; exp
                 <mesh position={[0, 0.08, 0]} material={mats.skyGardenLawn}>
                   <boxGeometry args={[1.5, 0.06, width * 0.5]} />
                 </mesh>
-                {/* Terrace Safety Glass Railing */}
-                <mesh position={[0.95, 0.5, 0]} material={mats.towerGlass}>
-                  <boxGeometry args={[0.04, 0.9, width * 0.6]} />
-                </mesh>
               </group>
             )}
           </group>
         );
       })}
 
-      {/* Soaring Aerodynamic Sky Crown & Antenna Spire */}
-      <group position={[0, (15 * 0.95 + 2.5) * explodeFactor, 0]}>
-        <mesh material={mats.exoSteel} castShadow>
-          <cylinderGeometry args={[1.8, 3.2, 2.4 * explodeFactor, 8]} />
-        </mesh>
-        <mesh position={[0, 1.8 * explodeFactor, 0]} material={mats.crownGlow}>
-          <cylinderGeometry args={[0.08, 0.12, 3.5, 12]} />
-        </mesh>
-      </group>
+      {/* Aerodynamic Sky Crown Spire */}
+      {sectionHeight >= 90 && (
+        <group position={[0, (15 * 0.95 + 2.5) * explodeFactor, 0]}>
+          <mesh material={mats.exoSteel} castShadow>
+            <cylinderGeometry args={[1.8, 3.2, 2.4 * explodeFactor, 8]} />
+          </mesh>
+          <mesh position={[0, 1.8 * explodeFactor, 0]} material={mats.crownGlow}>
+            <cylinderGeometry args={[0.08, 0.12, 3.5, 12]} />
+          </mesh>
+        </group>
+      )}
     </group>
   );
 }
 
 // -------------------------------------------------------------
 // 3. MODEL: HELIX PARAMETRIC BOTANICAL PAVILION (Sustainable Pavilion)
-// Double-curved reciprocal timber shell, biophilic spiral dome & reflecting pond
 // -------------------------------------------------------------
-function HelixParametricPavilion({ wireframe, exploded }: { wireframe: boolean; exploded: boolean }) {
+function HelixParametricPavilion({
+  wireframe,
+  exploded,
+  sectionHeight = 100,
+  onSelectElement,
+}: {
+  wireframe: boolean;
+  exploded: boolean;
+  sectionHeight?: number;
+  onSelectElement?: (el: BimElementData) => void;
+}) {
   const explodeFactor = exploded ? 1.5 : 1.0;
+  const isCut = sectionHeight < 80;
 
   const mats = useMemo(() => ({
     glulamRibs: new THREE.MeshStandardMaterial({ color: "#D97706", roughness: 0.45, metalness: 0.1, wireframe }),
@@ -377,25 +477,22 @@ function HelixParametricPavilion({ wireframe, exploded }: { wireframe: boolean; 
     skylightGlass: new THREE.MeshPhysicalMaterial({ color: "#A7F3D0", transparent: true, opacity: wireframe ? 0.9 : 0.35, roughness: 0.05, transmission: 0.9, thickness: 0.5, wireframe }),
     waterPool: new THREE.MeshStandardMaterial({ color: "#0284C7", roughness: 0.05, metalness: 0.9 }),
     stonePodium: new THREE.MeshStandardMaterial({ color: "#1E293B", roughness: 0.8, wireframe }),
-    greenLandscape: new THREE.MeshStandardMaterial({ color: "#15803D", roughness: 0.9, wireframe }),
   }), [wireframe]);
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Circular Landscaped Basin & Reflecting Pool */}
+      {/* Reflecting Pool Basin */}
       <mesh position={[0, 0.1, 0]} material={mats.stonePodium} receiveShadow>
         <cylinderGeometry args={[9.5, 10.0, 0.2, 48]} />
       </mesh>
       <mesh position={[0, 0.22, 0]} material={mats.waterPool}>
         <cylinderGeometry args={[8.4, 8.4, 0.05, 48]} />
       </mesh>
-
-      {/* Central Island Boardwalk */}
       <mesh position={[0, 0.3, 0]} material={mats.darkTimber} castShadow receiveShadow>
         <cylinderGeometry args={[4.2, 4.2, 0.12, 32]} />
       </mesh>
 
-      {/* Parametric Reciprocal Timber Shell Structure (Spiraling Glulam Ribs) */}
+      {/* Reciprocal Timber Gridshell Ribs */}
       <group position={[0, 1.8 * explodeFactor, 0]}>
         {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
           const angle = (i * Math.PI) / 6;
@@ -404,25 +501,38 @@ function HelixParametricPavilion({ wireframe, exploded }: { wireframe: boolean; 
           const z = Math.sin(angle) * radius;
 
           return (
-            <group key={`rib-${i}`} position={[x, 0, z]} rotation={[0.4, angle, 0]}>
-              {/* Primary Glulam Arch Rib */}
+            <group
+              key={`rib-${i}`}
+              position={[x, 0, z]}
+              rotation={[0.4, angle, 0]}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onSelectElement?.({
+                  id: `HELIX-RIB-${i + 1}`,
+                  name: `Reciprocal Glulam Arch Rib Node R-${i + 1}`,
+                  ifcType: "IfcMember",
+                  material: "Double-Curved Glulam Larch Wood (Grade GL32h)",
+                  dimensions: "220mm × 400mm × 5200mm",
+                  fireRating: "BS EN 1995-1-2 Structural Timber Fire Standard",
+                  structuralLoad: "38.5 kN Internal Node Shear Capacity",
+                  clashStatus: "clear",
+                  manufacturer: "Blumer Lehmann Timber Engineering",
+                });
+              }}
+            >
               <mesh material={mats.glulamRibs} castShadow>
                 <boxGeometry args={[0.22, 5.2 * explodeFactor, 0.4]} />
-              </mesh>
-              {/* Interlocking Transverse Ties */}
-              <mesh position={[0, 1.2 * explodeFactor, 0.4]} rotation={[0, 0, 0.7]} material={mats.glulamRibs} castShadow>
-                <boxGeometry args={[0.15, 2.8, 0.25]} />
               </mesh>
             </group>
           );
         })}
 
-        {/* Outer Infill Glazing Pillows */}
-        <mesh position={[0, 2.2 * explodeFactor, 0]} material={mats.skylightGlass}>
-          <sphereGeometry args={[6.2, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.48]} />
-        </mesh>
+        {(!isCut || sectionHeight > 60) && (
+          <mesh position={[0, 2.2 * explodeFactor, 0]} material={mats.skylightGlass}>
+            <sphereGeometry args={[6.2, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.48]} />
+          </mesh>
+        )}
 
-        {/* Central Crown Eye / Oculum Skylight Ring */}
         <mesh position={[0, 4.6 * explodeFactor, 0]} material={mats.glulamRibs} castShadow>
           <torusGeometry args={[2.0, 0.18, 16, 32]} />
         </mesh>
@@ -433,11 +543,20 @@ function HelixParametricPavilion({ wireframe, exploded }: { wireframe: boolean; 
 
 // -------------------------------------------------------------
 // 4. MODEL: KYOTO TIMBER RESIDENCE (Residential Complex)
-// Contemporary Sukiya-Zukuri architecture: low-slung pavilions,
-// deep Hinoki cypress eaves, Engawa verandas & Shoji screens
 // -------------------------------------------------------------
-function KyotoTimberResidence({ wireframe, exploded }: { wireframe: boolean; exploded: boolean }) {
+function KyotoTimberResidence({
+  wireframe,
+  exploded,
+  sectionHeight = 100,
+  onSelectElement,
+}: {
+  wireframe: boolean;
+  exploded: boolean;
+  sectionHeight?: number;
+  onSelectElement?: (el: BimElementData) => void;
+}) {
   const explodeFactor = exploded ? 1.5 : 1.0;
+  const isCut = sectionHeight < 75;
 
   const mats = useMemo(() => ({
     slateRoof: new THREE.MeshStandardMaterial({ color: "#1E293B", roughness: 0.4, wireframe }),
@@ -445,53 +564,29 @@ function KyotoTimberResidence({ wireframe, exploded }: { wireframe: boolean; exp
     darkCedar: new THREE.MeshStandardMaterial({ color: "#78350F", roughness: 0.6, wireframe }),
     shojiScreen: new THREE.MeshPhysicalMaterial({ color: "#FFFBEB", transparent: true, opacity: wireframe ? 0.9 : 0.65, roughness: 0.3, transmission: 0.4, wireframe }),
     zenGravel: new THREE.MeshStandardMaterial({ color: "#94A3B8", roughness: 0.9, wireframe }),
-    steppingStone: new THREE.MeshStandardMaterial({ color: "#334155", roughness: 0.8, wireframe }),
     engawaDeck: new THREE.MeshStandardMaterial({ color: "#D97706", roughness: 0.4, wireframe }),
   }), [wireframe]);
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Zen Gravel Courtyard & Stepping Stones */}
-      <mesh position={[0, 0.1, 0]} material={mats.zenGravel} receiveShadow>
-        <boxGeometry args={[18, 0.2, 14]} />
+      <mesh position={[0, 0.08, 0]} material={mats.zenGravel} receiveShadow>
+        <boxGeometry args={[18, 0.16, 16]} />
       </mesh>
-      {[-3, -1.5, 0, 1.5, 3].map((x, i) => (
-        <mesh key={`zen-stone-${i}`} position={[x, 0.22, 5.0]} material={mats.steppingStone} receiveShadow>
-          <cylinderGeometry args={[0.45, 0.5, 0.08, 16]} />
-        </mesh>
-      ))}
-
-      {/* Main Living Pavilion (West Wing) */}
-      <group position={[-2.8, 0.3 * explodeFactor, 0]}>
-        {/* Engawa Perimeter Veranda */}
+      {/* Main Pavilion */}
+      <group position={[-2.5, 0.4 * explodeFactor, 1.0]}>
         <mesh position={[0, 0.15, 0]} material={mats.engawaDeck} castShadow receiveShadow>
-          <boxGeometry args={[8.5, 0.2, 7.5]} />
+          <boxGeometry args={[9.5, 0.25, 7.5]} />
         </mesh>
-        {/* Hinoki Cypress Structural Frame & Posts */}
-        {[-3.6, -1.8, 0, 1.8, 3.6].map((x) =>
-          [-3.2, 3.2].map((z) => (
-            <mesh key={`post-${x}-${z}`} position={[x, 1.3, z]} material={mats.hinokiWood} castShadow>
-              <boxGeometry args={[0.18, 2.3, 0.18]} />
-            </mesh>
-          ))
+        <mesh position={[0, 1.4, 0]} material={mats.shojiScreen}>
+          <boxGeometry args={[8.4, 2.2, 6.4]} />
+        </mesh>
+        {(!isCut || sectionHeight > 50) && (
+          <mesh position={[0, 2.9 * explodeFactor, 0]} material={mats.slateRoof} castShadow receiveShadow>
+            <coneGeometry args={[6.8, 1.8, 4]} />
+          </mesh>
         )}
-        {/* Translucent Shoji Sliding Screens */}
-        <mesh position={[0, 1.3, 0]} material={mats.shojiScreen}>
-          <boxGeometry args={[7.2, 2.2, 6.2]} />
-        </mesh>
-        {/* Deep Low-Pitched Slate Hipped Roof with Overhanging Eaves */}
-        <group position={[0, 2.8 * explodeFactor, 0]}>
-          <mesh material={mats.slateRoof} castShadow receiveShadow>
-            <coneGeometry args={[6.4, 1.6, 4]} />
-          </mesh>
-          {/* Exposed Hinoki Eaves Fascia */}
-          <mesh position={[0, -0.7, 0]} material={mats.darkCedar}>
-            <boxGeometry args={[9.4, 0.12, 8.4]} />
-          </mesh>
-        </group>
       </group>
-
-      {/* Secondary Tea House & Research Wing (East Wing) */}
+      {/* Tea House Wing */}
       <group position={[4.2, 0.3 * explodeFactor, -1.5]}>
         <mesh position={[0, 0.15, 0]} material={mats.engawaDeck} castShadow receiveShadow>
           <boxGeometry args={[5.5, 0.2, 5.5]} />
@@ -499,9 +594,11 @@ function KyotoTimberResidence({ wireframe, exploded }: { wireframe: boolean; exp
         <mesh position={[0, 1.2, 0]} material={mats.shojiScreen}>
           <boxGeometry args={[4.8, 2.0, 4.8]} />
         </mesh>
-        <mesh position={[0, 2.5 * explodeFactor, 0]} material={mats.slateRoof} castShadow receiveShadow>
-          <coneGeometry args={[4.4, 1.3, 4]} />
-        </mesh>
+        {(!isCut || sectionHeight > 60) && (
+          <mesh position={[0, 2.5 * explodeFactor, 0]} material={mats.slateRoof} castShadow receiveShadow>
+            <coneGeometry args={[4.4, 1.3, 4]} />
+          </mesh>
+        )}
       </group>
     </group>
   );
@@ -509,10 +606,20 @@ function KyotoTimberResidence({ wireframe, exploded }: { wireframe: boolean; exp
 
 // -------------------------------------------------------------
 // 5. MODEL: AALTO INSTITUTE OF ADVANCED SCIENCES (Educational Campus)
-// Interconnected academic laboratory wings, cantilevered lecture hall & skybridge
 // -------------------------------------------------------------
-function AaltoScienceCampus({ wireframe, exploded }: { wireframe: boolean; exploded: boolean }) {
+function AaltoScienceCampus({
+  wireframe,
+  exploded,
+  sectionHeight = 100,
+  onSelectElement,
+}: {
+  wireframe: boolean;
+  exploded: boolean;
+  sectionHeight?: number;
+  onSelectElement?: (el: BimElementData) => void;
+}) {
   const explodeFactor = exploded ? 1.5 : 1.0;
+  const isCut = sectionHeight < 80;
 
   const mats = useMemo(() => ({
     whiteLimestone: new THREE.MeshStandardMaterial({ color: "#F1F5F9", roughness: 0.7, wireframe }),
@@ -525,25 +632,16 @@ function AaltoScienceCampus({ wireframe, exploded }: { wireframe: boolean; explo
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Campus Plaza Ground */}
       <mesh position={[0, 0.1, 0]} material={mats.campusPlaza} receiveShadow>
         <boxGeometry args={[18, 0.2, 16]} />
       </mesh>
-
-      {/* Main Science Wing A (West) */}
+      {/* Science Wing A */}
       <group position={[-4.5, 2.2 * explodeFactor, 0]}>
         <mesh material={mats.whiteLimestone} castShadow receiveShadow>
           <boxGeometry args={[5.5, 4.2 * explodeFactor, 10.5]} />
         </mesh>
-        {/* Ribbon Laboratory Windows */}
-        {[-1.0, 0.8].map((y, i) => (
-          <mesh key={`ribbon-w-${i}`} position={[0, y * explodeFactor, 0]} material={mats.labGlass}>
-            <boxGeometry args={[5.6, 0.65, 10.6]} />
-          </mesh>
-        ))}
       </group>
-
-      {/* Interconnecting Elevated Glass Skybridge */}
+      {/* Elevated Skybridge */}
       <group position={[0, 3.2 * explodeFactor, 0]}>
         <mesh material={mats.skybridgeSteel} castShadow>
           <boxGeometry args={[4.2, 0.25, 2.4]} />
@@ -552,57 +650,50 @@ function AaltoScienceCampus({ wireframe, exploded }: { wireframe: boolean; explo
           <boxGeometry args={[4.0, 1.4 * explodeFactor, 2.2]} />
         </mesh>
       </group>
-
-      {/* Research Wing B & Fan-Shaped Cantilevered Lecture Auditorium */}
-      <group position={[4.5, 1.8 * explodeFactor, -1.0]}>
-        <mesh material={mats.darkBrick} castShadow receiveShadow>
-          <boxGeometry args={[5.0, 3.4 * explodeFactor, 8.5]} />
-        </mesh>
-      </group>
-
-      {/* Bold Cantilevered Lecture Auditorium (Copper / Bronze Clad) */}
-      <group position={[3.8, 3.6 * explodeFactor, 3.2]}>
-        <mesh material={mats.lectureCopper} castShadow receiveShadow>
-          <boxGeometry args={[5.2, 2.2, 4.8]} />
-        </mesh>
-        {/* Colonnade Columns Below Auditorium */}
-        {[-1.8, 1.8].map((x) => (
-          <mesh key={`aud-col-${x}`} position={[x, -2.4 * explodeFactor, 0]} material={mats.skybridgeSteel} castShadow>
-            <cylinderGeometry args={[0.16, 0.16, 2.6, 16]} />
+      {/* Cantilevered Copper Auditorium */}
+      {(!isCut || sectionHeight > 45) && (
+        <group position={[3.8, 3.6 * explodeFactor, 3.2]}>
+          <mesh material={mats.lectureCopper} castShadow receiveShadow>
+            <boxGeometry args={[5.2, 2.2, 4.8]} />
           </mesh>
-        ))}
-      </group>
+        </group>
+      )}
     </group>
   );
 }
 
 // -------------------------------------------------------------
 // 6. MODEL: MARINA BAY WATERFRONT TRANSIT CONCOURSE (Civic & Infrastructure)
-// Sweeping kinetic tensile roof canopy, steel parabolic arches & sunken concourse
 // -------------------------------------------------------------
-function MarinaTransitConcourse({ wireframe, exploded }: { wireframe: boolean; exploded: boolean }) {
+function MarinaTransitConcourse({
+  wireframe,
+  exploded,
+  sectionHeight = 100,
+  onSelectElement,
+}: {
+  wireframe: boolean;
+  exploded: boolean;
+  sectionHeight?: number;
+  onSelectElement?: (el: BimElementData) => void;
+}) {
   const explodeFactor = exploded ? 1.5 : 1.0;
+  const isCut = sectionHeight < 80;
 
   const mats = useMemo(() => ({
     whiteCanopy: new THREE.MeshPhysicalMaterial({ color: "#FFFFFF", transparent: true, opacity: wireframe ? 0.9 : 0.7, roughness: 0.1, transmission: 0.3, thickness: 0.4, wireframe }),
     archSteel: new THREE.MeshStandardMaterial({ color: "#0F172A", metalness: 0.95, roughness: 0.15, wireframe }),
     subwayConcourse: new THREE.MeshStandardMaterial({ color: "#1E293B", roughness: 0.7, wireframe }),
     waterPool: new THREE.MeshStandardMaterial({ color: "#0284C7", roughness: 0.05, metalness: 0.9 }),
-    glazing: new THREE.MeshPhysicalMaterial({ color: "#99EEFF", transparent: true, opacity: wireframe ? 0.9 : 0.35, roughness: 0.04, transmission: 0.92, wireframe }),
   }), [wireframe]);
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Sunken Multimodal Concourse Ground & Water Basins */}
       <mesh position={[0, 0.08, 0]} material={mats.subwayConcourse} receiveShadow>
         <boxGeometry args={[18, 0.16, 15]} />
       </mesh>
-      {/* Water Cooling Moat */}
       <mesh position={[0, 0.18, 5.2]} material={mats.waterPool}>
         <boxGeometry args={[14, 0.06, 2.4]} />
       </mesh>
-
-      {/* Grand Parabolic White Steel Arches */}
       {[-4.5, 0, 4.5].map((x) => (
         <group key={`arch-${x}`} position={[x, 2.5 * explodeFactor, 0]}>
           <mesh material={mats.archSteel} castShadow>
@@ -610,20 +701,203 @@ function MarinaTransitConcourse({ wireframe, exploded }: { wireframe: boolean; e
           </mesh>
         </group>
       ))}
+      {(!isCut || sectionHeight > 40) && (
+        <group position={[0, 4.5 * explodeFactor, 0]}>
+          <mesh material={mats.whiteCanopy} castShadow receiveShadow>
+            <cylinderGeometry args={[5.4, 7.8, 1.2 * explodeFactor, 32, 1, true, 0, Math.PI]} />
+          </mesh>
+        </group>
+      )}
+    </group>
+  );
+}
 
-      {/* Sweeping Kinetic Tensile Roof Canopy (Fluid Double-Curved Membrane) */}
-      <group position={[0, 4.5 * explodeFactor, 0]}>
-        <mesh material={mats.whiteCanopy} castShadow receiveShadow>
-          <cylinderGeometry args={[5.4, 7.8, 1.2 * explodeFactor, 32, 1, true, 0, Math.PI]} />
+// -------------------------------------------------------------
+// 7. MODEL: HYPERLOOP REGIONAL KINETIC CONCOURSE (High-Speed Transit Hub)
+// -------------------------------------------------------------
+function HyperloopKineticHub({
+  wireframe,
+  exploded,
+  sectionHeight = 100,
+  onSelectElement,
+}: {
+  wireframe: boolean;
+  exploded: boolean;
+  sectionHeight?: number;
+  onSelectElement?: (el: BimElementData) => void;
+}) {
+  const explodeFactor = exploded ? 1.5 : 1.0;
+  const isCut = sectionHeight < 80;
+
+  const mats = useMemo(() => ({
+    titaniumShell: new THREE.MeshStandardMaterial({ color: "#E2E8F0", metalness: 0.88, roughness: 0.15, wireframe }),
+    vacuumTube: new THREE.MeshStandardMaterial({ color: "#0F172A", metalness: 0.95, roughness: 0.1, wireframe }),
+    maglevGlow: new THREE.MeshStandardMaterial({ color: "#00F0FF", emissive: "#00F0FF", emissiveIntensity: 1.2 }),
+    concourseGlass: new THREE.MeshPhysicalMaterial({ color: "#E0F2FE", transparent: true, opacity: wireframe ? 0.9 : 0.35, roughness: 0.05, transmission: 0.9, thickness: 0.5, wireframe }),
+    platformSlab: new THREE.MeshStandardMaterial({ color: "#1E293B", roughness: 0.8, wireframe }),
+    waterMirror: new THREE.MeshStandardMaterial({ color: "#0369A1", metalness: 0.95, roughness: 0.04 }),
+  }), [wireframe]);
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* Platform & Reflecting Basin */}
+      <mesh position={[0, 0.1, 0]} material={mats.platformSlab} receiveShadow>
+        <boxGeometry args={[22, 0.2, 14]} />
+      </mesh>
+      <mesh position={[0, 0.18, 5]} material={mats.waterMirror}>
+        <boxGeometry args={[18, 0.05, 3]} />
+      </mesh>
+
+      {/* Twin Hyperloop Vacuum Tubes (Axis A & Axis B) */}
+      {[-2.8, 2.8].map((z, idx) => (
+        <group
+          key={`tube-${idx}`}
+          position={[0, 1.6 * explodeFactor, z]}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onSelectElement?.({
+              id: `HL-TUBE-0${idx + 1}`,
+              name: `Hyperloop Vacuum Tube Pressure Vessel Axis 0${idx + 1}`,
+              ifcType: "IfcDistributionChamberElement",
+              material: "Cryogenic High-Tensile Steel EN 10025-6 (Wall 28mm)",
+              dimensions: "3.2m Outer ⌀ × 22m Module × Wall 28mm",
+              fireRating: "Class A1 Incombustible",
+              structuralLoad: "100 kPa Internal Differential Vacuum Pressure",
+              clashStatus: "conflict",
+              manufacturer: "Virgin Hyperloop Engineering / Alstom",
+            });
+          }}
+        >
+          <mesh rotation={[0, 0, Math.PI / 2]} material={mats.vacuumTube} castShadow>
+            <cylinderGeometry args={[0.9, 0.9, 21, 32]} />
+          </mesh>
+          <mesh rotation={[0, 0, Math.PI / 2]} position={[0, -0.65, 0]} material={mats.maglevGlow}>
+            <boxGeometry args={[0.3, 21, 0.08]} />
+          </mesh>
+          {[-7, -3.5, 0, 3.5, 7].map((x) => (
+            <mesh key={`pylon-${x}`} position={[x, -0.8 * explodeFactor, 0]} material={mats.platformSlab} castShadow>
+              <cylinderGeometry args={[0.22, 0.28, 1.4, 16]} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
+      {/* Central Glazed Boarding Passenger Concourse */}
+      <group position={[0, 1.4 * explodeFactor, 0]}>
+        <mesh material={mats.concourseGlass} castShadow>
+          <boxGeometry args={[14, 2.2 * explodeFactor, 4.4]} />
         </mesh>
       </group>
 
-      {/* Subterranean Concourse Entrances & Escalators */}
-      <group position={[0, 1.0 * explodeFactor, -1.5]}>
-        <mesh material={mats.glazing}>
-          <boxGeometry args={[8.5, 1.8, 4.5]} />
-        </mesh>
-      </group>
+      {/* Sweeping Kinetic Titanium Canopy */}
+      {(!isCut || sectionHeight > 50) && (
+        <group position={[0, 3.8 * explodeFactor, 0]}>
+          <mesh material={mats.titaniumShell} castShadow receiveShadow>
+            <cylinderGeometry args={[6.8, 10.2, 1.4 * explodeFactor, 32, 1, false, 0, Math.PI]} />
+          </mesh>
+        </group>
+      )}
+    </group>
+  );
+}
+
+// -------------------------------------------------------------
+// 8. MODEL: TERRA NOVA 28-STORY MASS-TIMBER SKYSCRAPER (Plyscraper)
+// -------------------------------------------------------------
+function TerraNovaTimberSkyscraper({
+  wireframe,
+  exploded,
+  sectionHeight = 100,
+  onSelectElement,
+}: {
+  wireframe: boolean;
+  exploded: boolean;
+  sectionHeight?: number;
+  onSelectElement?: (el: BimElementData) => void;
+}) {
+  const explodeFactor = exploded ? 1.4 : 1.0;
+  const maxLevels = Math.max(2, Math.round((sectionHeight / 100) * 18));
+  const floorLevels = Array.from({ length: maxLevels }, (_, i) => i);
+
+  const mats = useMemo(() => ({
+    cltTimber: new THREE.MeshStandardMaterial({ color: "#D97706", roughness: 0.5, metalness: 0.05, wireframe }),
+    darkGlulam: new THREE.MeshStandardMaterial({ color: "#78350F", roughness: 0.6, wireframe }),
+    timberCurtainGlass: new THREE.MeshPhysicalMaterial({ color: "#BAE6FD", transparent: true, opacity: wireframe ? 0.9 : 0.28, roughness: 0.04, transmission: 0.92, thickness: 0.6, wireframe }),
+    concretePodium: new THREE.MeshStandardMaterial({ color: "#1E293B", roughness: 0.8, wireframe }),
+    skyGardenGreen: new THREE.MeshStandardMaterial({ color: "#15803D", roughness: 0.9, wireframe }),
+  }), [wireframe]);
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* Ground Podium & Plaza */}
+      <mesh position={[0, 0.15, 0]} material={mats.concretePodium} receiveShadow>
+        <boxGeometry args={[16, 0.3, 16]} />
+      </mesh>
+
+      {/* CLT Tower Levels */}
+      {floorLevels.map((lvl) => {
+        const yPos = (lvl * 0.95 + 0.6) * explodeFactor;
+        const width = 8.0 - lvl * 0.12;
+        const hasTerrace = lvl % 4 === 0 && lvl > 2;
+
+        return (
+          <group
+            key={`clt-fl-${lvl}`}
+            position={[0, yPos, 0]}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onSelectElement?.({
+                id: `CLT-DIAGRID-L${lvl}`,
+                name: `Level ${lvl} Cross-Laminated Timber (CLT) Diagrid Core`,
+                ifcType: "IfcMember",
+                material: "7-Ply Douglas Fir Cross-Laminated Timber (CLT)",
+                dimensions: `${width.toFixed(1)}m × ${width.toFixed(1)}m Floor Plate × 350mm Slab`,
+                fireRating: "120-Minute Charring Rate (NBCC Mass Timber Standard)",
+                thermalTransmittance: "U = 0.11 W/m²K",
+                structuralLoad: "45.0 MN Total Tower Gravitational Load Transfer",
+                clashStatus: "clear",
+                manufacturer: "StructureCraft Tall Wood Engineering",
+              });
+            }}
+          >
+            {/* Mass-Timber Floor Slab */}
+            <mesh material={mats.cltTimber} castShadow>
+              <boxGeometry args={[width, 0.18, width]} />
+            </mesh>
+
+            {/* Facade Glass Curtain */}
+            <mesh position={[0, 0.45 * explodeFactor, 0]} material={mats.timberCurtainGlass}>
+              <boxGeometry args={[width - 0.2, 0.86 * explodeFactor, width - 0.2]} />
+            </mesh>
+
+            {/* Perimeter CLT Diagrid Columns */}
+            {[-1, 1].map((sx) =>
+              [-1, 1].map((sz) => (
+                <mesh
+                  key={`diagrid-${lvl}-${sx}-${sz}`}
+                  position={[(width / 2 - 0.15) * sx, 0.45 * explodeFactor, (width / 2 - 0.15) * sz]}
+                  material={mats.darkGlulam}
+                  castShadow
+                >
+                  <boxGeometry args={[0.3, 0.95 * explodeFactor, 0.3]} />
+                </mesh>
+              ))
+            )}
+
+            {/* Cascading Biophilic Sky Terraces */}
+            {hasTerrace && (
+              <group position={[width / 2 + 0.6, 0.06, 0]}>
+                <mesh material={mats.cltTimber} castShadow>
+                  <boxGeometry args={[1.5, 0.1, width * 0.5]} />
+                </mesh>
+                <mesh position={[0, 0.08, 0]} material={mats.skyGardenGreen}>
+                  <boxGeometry args={[1.3, 0.05, width * 0.45]} />
+                </mesh>
+              </group>
+            )}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -636,48 +910,57 @@ function DynamicProjectBuildingModel({
   projectCategory,
   wireframe,
   exploded,
+  sectionHeight = 100,
+  onSelectElement,
 }: {
   projectId?: string;
   projectCategory?: ProjectCategory;
   wireframe: boolean;
   exploded: boolean;
+  sectionHeight?: number;
+  onSelectElement?: (el: BimElementData) => void;
 }) {
-  // 1. Direct Project ID mapping
   if (projectId === "prj-vertex-tower") {
-    return <VertexBiophilicTower wireframe={wireframe} exploded={exploded} />;
+    return <VertexBiophilicTower wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
   if (projectId === "prj-helix-pavilion") {
-    return <HelixParametricPavilion wireframe={wireframe} exploded={exploded} />;
+    return <HelixParametricPavilion wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
   if (projectId === "prj-kyoto-residence") {
-    return <KyotoTimberResidence wireframe={wireframe} exploded={exploded} />;
+    return <KyotoTimberResidence wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
   if (projectId === "prj-aalto-sciences") {
-    return <AaltoScienceCampus wireframe={wireframe} exploded={exploded} />;
+    return <AaltoScienceCampus wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
   if (projectId === "prj-marina-transit") {
-    return <MarinaTransitConcourse wireframe={wireframe} exploded={exploded} />;
+    return <MarinaTransitConcourse wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
+  }
+  if (projectId === "prj-hyperloop-hub") {
+    return <HyperloopKineticHub wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
+  }
+  if (projectId === "prj-timber-skyscraper") {
+    return <TerraNovaTimberSkyscraper wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
 
-  // 2. Category Fallback for custom user created projects
+  // Category fallbacks
   if (projectCategory === "Commercial High-Rise") {
-    return <VertexBiophilicTower wireframe={wireframe} exploded={exploded} />;
+    return <VertexBiophilicTower wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
   if (projectCategory === "Sustainable Pavilion") {
-    return <HelixParametricPavilion wireframe={wireframe} exploded={exploded} />;
+    return <HelixParametricPavilion wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
   if (projectCategory === "Residential Complex") {
-    return <KyotoTimberResidence wireframe={wireframe} exploded={exploded} />;
+    return <KyotoTimberResidence wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
   if (projectCategory === "Educational Campus") {
-    return <AaltoScienceCampus wireframe={wireframe} exploded={exploded} />;
+    return <AaltoScienceCampus wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
   if (projectCategory === "Civic & Infrastructure") {
-    return <MarinaTransitConcourse wireframe={wireframe} exploded={exploded} />;
+    return <HyperloopKineticHub wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
   }
 
   // Default: Nordic Cultural Forum
-  return <NordicCulturalForum wireframe={wireframe} exploded={exploded} />;
+  return <NordicCulturalForum wireframe={wireframe} exploded={exploded} sectionHeight={sectionHeight} onSelectElement={onSelectElement} />;
 }
 
 // -------------------------------------------------------------
@@ -748,20 +1031,14 @@ function LoadedGLTFModel({
             meshCount,
             vertexCount,
             materialsCount: materialsSet.size,
-            boundingBox: [
-              parseFloat(size.x.toFixed(1)),
-              parseFloat(size.y.toFixed(1)),
-              parseFloat(size.z.toFixed(1)),
-            ],
+            boundingBox: [parseFloat(size.x.toFixed(1)), parseFloat(size.y.toFixed(1)), parseFloat(size.z.toFixed(1))],
           });
         }
       },
       undefined,
-      (error) => {
-        if (isCancelled) return;
-        console.error("Failed to load GLTF model:", error);
-        if (onError) {
-          onError("Could not parse 3D GLTF/GLB file. Please verify it is a valid 3D asset.");
+      (err) => {
+        if (!isCancelled && onError) {
+          onError((err as any)?.message || "Failed to load 3D GLB/GLTF model");
         }
       }
     );
@@ -769,39 +1046,37 @@ function LoadedGLTFModel({
     return () => {
       isCancelled = true;
     };
-  }, [url, onLoaded, onError]);
+  }, [url]);
 
   useEffect(() => {
     if (!sceneObj) return;
     sceneObj.traverse((node: any) => {
       if (node.isMesh && node.material) {
         if (Array.isArray(node.material)) {
-          node.material.forEach((mat: any) => {
-            mat.wireframe = wireframe;
-          });
+          node.material.forEach((m: any) => (m.wireframe = wireframe));
         } else {
           node.material.wireframe = wireframe;
         }
       }
     });
-  }, [sceneObj, wireframe]);
+  }, [wireframe, sceneObj]);
 
-  useEffect(() => {
-    if (!sceneObj) return;
-    sceneObj.traverse((node: any) => {
-      if (node.isMesh && node.position.y > 2) {
-        node.position.y = exploded ? node.position.y * 1.3 : node.position.y;
-      }
-    });
-  }, [sceneObj, exploded]);
-
-  if (!sceneObj) return null;
+  if (!sceneObj) {
+    return (
+      <Html center>
+        <div className="flex items-center gap-2 bg-cad-900 border border-cyan/40 px-3 py-1.5 rounded-lg text-cyan text-xs font-mono shadow-2xl">
+          <div className="w-3.5 h-3.5 border-2 border-cyan border-t-transparent rounded-full animate-spin" />
+          <span>PARSING GLB GEOMETRY...</span>
+        </div>
+      </Html>
+    );
+  }
 
   return <primitive object={sceneObj} />;
 }
 
 // -------------------------------------------------------------
-// Camera Director
+// Camera Director with Smooth Animations
 // -------------------------------------------------------------
 function CameraDirector({
   controlsRef,
@@ -823,68 +1098,63 @@ function CameraDirector({
   const { camera } = useThree();
 
   useEffect(() => {
-    if (!focusPosition || !controlsRef.current) return;
-    const [x, y, z] = focusPosition;
-
-    controlsRef.current.target.set(x, y, z);
-    camera.position.set(x + 5.5, y + 4.0, z + 5.5);
-    camera.lookAt(x, y, z);
-    controlsRef.current.update();
-  }, [focusPosition, camera, controlsRef]);
-
-  useEffect(() => {
-    if (!presetView || !controlsRef.current) return;
-
-    controlsRef.current.target.set(0, 3.5, 0);
+    if (!controlsRef.current) return;
+    const controls = controlsRef.current;
 
     switch (presetView) {
+      case "perspective":
+        camera.position.set(14, 11, 14);
+        controls.target.set(0, 3, 0);
+        break;
       case "top":
-        camera.position.set(0, 26, 0.001);
+        camera.position.set(0, 24, 0.001);
+        controls.target.set(0, 0, 0);
         break;
       case "front":
-        camera.position.set(0, 4.5, 20);
+        camera.position.set(0, 5, 20);
+        controls.target.set(0, 4, 0);
         break;
       case "side":
-        camera.position.set(20, 4.5, 0);
-        break;
-      case "perspective":
-      default:
-        camera.position.set(14, 11, 14);
+        camera.position.set(20, 5, 0);
+        controls.target.set(0, 4, 0);
         break;
     }
-    camera.lookAt(0, 3.5, 0);
-    controlsRef.current.update();
+    controls.update();
   }, [presetView, camera, controlsRef]);
 
   useEffect(() => {
-    if (resetTrigger === undefined || resetTrigger === 0 || !controlsRef.current) return;
-    controlsRef.current.target.set(0, 3.5, 0);
+    if (resetTrigger === 0 || !controlsRef.current) return;
     camera.position.set(14, 11, 14);
-    camera.lookAt(0, 3.5, 0);
+    controlsRef.current.target.set(0, 3, 0);
     controlsRef.current.update();
   }, [resetTrigger, camera, controlsRef]);
 
   useEffect(() => {
-    if (fitToViewTrigger === undefined || fitToViewTrigger === 0 || !controlsRef.current) return;
-    controlsRef.current.target.set(0, 3.5, 0);
-    camera.position.set(15, 12, 15);
-    camera.lookAt(0, 3.5, 0);
+    if (fitToViewTrigger === 0 || !controlsRef.current) return;
+    camera.position.set(15, 10, 15);
+    controlsRef.current.target.set(0, 3, 0);
     controlsRef.current.update();
   }, [fitToViewTrigger, camera, controlsRef]);
 
   useEffect(() => {
-    if (zoomInTrigger === undefined || zoomInTrigger === 0 || !controlsRef.current) return;
-    const dir = new THREE.Vector3().subVectors(controlsRef.current.target, camera.position).normalize();
-    camera.position.addScaledVector(dir, 2.5);
-    controlsRef.current.update();
+    if (zoomInTrigger === 0) return;
+    camera.position.multiplyScalar(0.85);
+    controlsRef.current?.update();
   }, [zoomInTrigger, camera, controlsRef]);
 
   useEffect(() => {
-    if (zoomOutTrigger === undefined || zoomOutTrigger === 0 || !controlsRef.current) return;
-    const dir = new THREE.Vector3().subVectors(controlsRef.current.target, camera.position).normalize();
-    camera.position.addScaledVector(dir, -2.8);
-    controlsRef.current.update();
+    if (zoomOutTrigger === 0) return;
+    camera.position.multiplyScalar(1.15);
+    controlsRef.current?.update();
   }, [zoomOutTrigger, camera, controlsRef]);
+
+  useEffect(() => {
+    if (!focusPosition || !controlsRef.current) return;
+    const [tx, ty, tz] = focusPosition;
+    controlsRef.current.target.set(tx, ty, tz);
+    camera.position.set(tx + 4, ty + 3, tz + 4);
+    controlsRef.current.update();
+  }, [focusPosition, camera, controlsRef]);
 
   return null;
 }
@@ -916,9 +1186,27 @@ export default function ArchitecturalScene({
   focusPosition,
   onModelLoaded,
   onModelError,
+  autoRotate = false,
+  isSectionCut = false,
+  sectionCutHeight = 100,
+  isMeasuring = false,
+  onMeasuredDistance,
+  onSelectBimElement,
 }: ArchitecturalSceneProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const [hoverPosition, setHoverPosition] = useState<[number, number, number] | null>(null);
+
+  // 3D Laser Measurement points
+  const [measurePointA, setMeasurePointA] = useState<[number, number, number] | null>(null);
+  const [measurePointB, setMeasurePointB] = useState<[number, number, number] | null>(null);
+
+  useEffect(() => {
+    if (!isMeasuring) {
+      setMeasurePointA(null);
+      setMeasurePointB(null);
+      onMeasuredDistance?.(null);
+    }
+  }, [isMeasuring]);
 
   const sunPos = useMemo(() => {
     const rad = (sunAngle * Math.PI) / 180;
@@ -943,6 +1231,29 @@ export default function ArchitecturalScene({
         parseFloat(e.point.z.toFixed(2)),
       ];
       onCanvasClickToAddAnnotation(pos);
+      return;
+    }
+
+    if (isMeasuring && e.point) {
+      e.stopPropagation();
+      const clickedPos: [number, number, number] = [
+        parseFloat(e.point.x.toFixed(2)),
+        parseFloat(e.point.y.toFixed(2)),
+        parseFloat(e.point.z.toFixed(2)),
+      ];
+
+      if (!measurePointA || (measurePointA && measurePointB)) {
+        setMeasurePointA(clickedPos);
+        setMeasurePointB(null);
+        onMeasuredDistance?.(null);
+      } else {
+        setMeasurePointB(clickedPos);
+        const v1 = new THREE.Vector3(...measurePointA);
+        const v2 = new THREE.Vector3(...clickedPos);
+        const dist = v1.distanceTo(v2);
+        onMeasuredDistance?.(dist);
+      }
+      return;
     }
   };
 
@@ -961,7 +1272,7 @@ export default function ArchitecturalScene({
   return (
     <div
       className={`relative w-full h-full select-none ${
-        isAddingAnnotation ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"
+        isAddingAnnotation || isMeasuring ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"
       }`}
     >
       <Canvas
@@ -988,10 +1299,10 @@ export default function ArchitecturalScene({
 
         <ContactShadows
           position={[0, -0.01, 0]}
-          opacity={0.65}
-          scale={38}
-          blur={2.4}
-          far={12}
+          opacity={0.7}
+          scale={40}
+          blur={2.2}
+          far={14}
           resolution={1024}
           color="#000000"
         />
@@ -1010,14 +1321,14 @@ export default function ArchitecturalScene({
           {showGrid && (
             <Grid
               position={[0, -0.015, 0]}
-              args={[32, 32]}
+              args={[34, 34]}
               cellSize={1.2}
               cellThickness={1}
               cellColor="#1E293B"
               sectionSize={6}
               sectionThickness={1.5}
               sectionColor="#00F0FF"
-              fadeDistance={36}
+              fadeDistance={38}
               fadeStrength={1.5}
             />
           )}
@@ -1040,8 +1351,23 @@ export default function ArchitecturalScene({
                 projectCategory={projectCategory}
                 wireframe={wireframeMode}
                 exploded={explodedView}
+                sectionHeight={isSectionCut ? sectionCutHeight : 100}
+                onSelectElement={onSelectBimElement}
               />
             </Center>
+          )}
+
+          {/* Laser Measurement Line */}
+          {measurePointA && measurePointB && (
+            <MeasurementLaserLine start={measurePointA} end={measurePointB} />
+          )}
+
+          {/* Pending Single Point Measurement Marker */}
+          {measurePointA && !measurePointB && (
+            <mesh position={measurePointA}>
+              <sphereGeometry args={[0.2, 16, 16]} />
+              <meshBasicMaterial color="#10B981" />
+            </mesh>
           )}
 
           {isAddingAnnotation && hoverPosition && (
@@ -1065,9 +1391,11 @@ export default function ArchitecturalScene({
           ref={controlsRef}
           makeDefault
           enableDamping
-          dampingFactor={0.08}
+          dampingFactor={0.06}
+          autoRotate={autoRotate}
+          autoRotateSpeed={1.0}
           minDistance={2}
-          maxDistance={55}
+          maxDistance={58}
           maxPolarAngle={Math.PI / 2 - 0.02}
         />
       </Canvas>
