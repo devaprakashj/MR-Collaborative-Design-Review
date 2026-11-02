@@ -244,6 +244,9 @@ export default function DesignWorkspacePage() {
         {/* 3D WebGL Canvas Area */}
         <div className="relative flex-1 h-full w-full bg-cad-950">
           <ArchitecturalScene
+            projectId={projectId}
+            projectCategory={project?.category}
+            projectName={project?.name}
             customModelUrl={customModel?.url}
             wireframeMode={wireframeMode}
             explodedView={explodedView}

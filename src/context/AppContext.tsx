@@ -108,7 +108,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       const savedAnnotations = localStorage.getItem("mr_cdr_annotations");
       if (savedAnnotations) {
-        setAnnotations(JSON.parse(savedAnnotations));
+        const parsed = JSON.parse(savedAnnotations);
+        const existingIds = new Set(parsed.map((a: Annotation) => a.id));
+        const merged = [...parsed, ...INITIAL_ANNOTATIONS.filter((a) => !existingIds.has(a.id))];
+        setAnnotations(merged);
       }
     } catch {
       // Ignore storage errors
