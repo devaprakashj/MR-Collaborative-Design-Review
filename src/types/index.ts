@@ -40,19 +40,6 @@ export interface ModelMetadata {
   customFileUrl?: string;
 }
 
-export interface BimElementData {
-  id: string;
-  name: string;
-  ifcType: string;
-  material: string;
-  dimensions: string;
-  fireRating: string;
-  thermalTransmittance?: string;
-  structuralLoad?: string;
-  clashStatus?: "clear" | "conflict";
-  manufacturer?: string;
-}
-
 export interface Annotation {
   id: string;
   projectId: string;

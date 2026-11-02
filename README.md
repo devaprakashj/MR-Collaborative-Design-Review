@@ -174,6 +174,57 @@ npm run start
 
 ---
 
+## ☁️ Cloudflare Pages Live Deployment (Step-by-Step)
+
+The project is pre-configured with Next.js **Static HTML Export** (`output: 'export'`) in `next.config.mjs` and includes a ready `wrangler.toml`. It deploys to **Cloudflare Pages** in under 2 minutes with zero configuration headaches!
+
+### Method 1: Deploy via Cloudflare Dashboard (Recommended)
+
+1. **Push your code to GitHub** (see [GitHub Setup Guide](#-pushing-to-github) below).
+2. Go to the [Cloudflare Dashboard](https://dash.cloudflare.com/) and navigate to **Workers & Pages** → **Create application** → **Pages** → **Connect to Git**.
+3. Select your repository: `MR-Collaborative-Design-Review`.
+4. Configure the build settings:
+   - **Framework preset**: `Next.js (Static HTML Export)` or `None`
+   - **Build command**: `npm run build`
+   - **Build output directory**: `out`
+   - **Root directory**: `/` (leave empty or default)
+5. Under **Environment variables (advanced)**, add:
+   - `NODE_VERSION`: `20.17.0`
+6. Click **Save and Deploy**. Your live URL will be active immediately (e.g. `https://mr-collaborative-design-review.pages.dev`)!
+
+---
+
+### Method 2: Deploy directly via Wrangler CLI
+
+If you prefer terminal deployment without connecting Git:
+```bash
+# 1. Build the static production bundle
+npm run build
+
+# 2. Deploy the 'out' directory to Cloudflare Pages
+npx wrangler pages deploy out --project-name=mr-collaborative-design-review
+```
+
+---
+
+## 🐙 Pushing to GitHub
+
+To publish this project to your GitHub account:
+
+```bash
+# 1. Create a new repository on GitHub named "MR-Collaborative-Design-Review"
+# (Do NOT initialize with README or license, as they are already here)
+
+# 2. Link your local repo to GitHub (replace YOUR-USERNAME with your GitHub handle):
+git remote add origin https://github.com/YOUR-USERNAME/MR-Collaborative-Design-Review.git
+
+# 3. Rename branch to main if preferred, then push:
+git branch -M main
+git push -u origin main
+```
+
+---
+
 ## 🔌 Supabase Cloud Integration (Phase 2 Ready)
 
 The application includes an abstracted cloud adapter in [`src/lib/supabase.ts`](src/lib/supabase.ts). To connect to a live Supabase project:

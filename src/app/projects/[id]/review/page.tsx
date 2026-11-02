@@ -10,7 +10,6 @@ import { ModelInspectorPanel } from "@/components/viewer3d/ModelInspectorPanel";
 import { ReviewActionBar } from "@/components/viewer3d/ReviewActionBar";
 import { ModelUploadModal } from "@/components/viewer3d/ModelUploadModal";
 import { CameraPresetView } from "@/components/viewer3d/ArchitecturalScene";
-import { BimElementData } from "@/types";
 import {
   ArrowLeft,
   Box,
@@ -81,43 +80,10 @@ export default function DesignWorkspacePage() {
   const [lightingMode, setLightingMode] = useState<"day" | "dusk" | "studio">("day");
   const [sunAngle, setSunAngle] = useState(45);
 
-  // Unity-Grade CAD Interactive States
-  const [isSectionCut, setIsSectionCut] = useState(false);
-  const [sectionCutHeight, setSectionCutHeight] = useState(100);
-  const [autoRotate, setAutoRotate] = useState(false);
-  const [isMeasuring, setIsMeasuring] = useState(false);
-  const [measuredDistance, setMeasuredDistance] = useState<number | null>(null);
-  const [selectedBimElement, setSelectedBimElement] = useState<BimElementData | null>(null);
-
   // Modals & Drawers
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [rightDrawer, setRightDrawer] = useState<"annotations" | "inspector" | "none">("annotations");
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-
-  const handleSelectBimElement = (el: BimElementData) => {
-    setSelectedBimElement(el);
-    setRightDrawer("inspector");
-    showToast("BIM Component Inspected", el.name, "info");
-  };
-
-  const handleToggleMeasuring = () => {
-    const next = !isMeasuring;
-    setIsMeasuring(next);
-    if (next) {
-      setIsAddingAnnotation(false);
-      showToast("3D Laser Ruler Active", "Click Point A, then Point B to measure distance", "info");
-    } else {
-      setMeasuredDistance(null);
-    }
-  };
-
-  const handleToggleSectionCut = () => {
-    const next = !isSectionCut;
-    setIsSectionCut(next);
-    if (next) {
-      showToast("Section Box Active", "Adjust elevation slider to inspect interior slabs", "info");
-    }
-  };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -299,12 +265,6 @@ export default function DesignWorkspacePage() {
             zoomOutTrigger={zoomOutTrigger}
             focusPosition={focusPosition}
             onModelError={(err) => showToast("3D Model Error", err, "error")}
-            autoRotate={autoRotate}
-            isSectionCut={isSectionCut}
-            sectionCutHeight={sectionCutHeight}
-            isMeasuring={isMeasuring}
-            onMeasuredDistance={setMeasuredDistance}
-            onSelectBimElement={handleSelectBimElement}
           />
 
           {/* Floating Viewport Toolstrip */}
@@ -331,16 +291,6 @@ export default function DesignWorkspacePage() {
             isCustomModel={!!customModel}
             onOpenUpload={() => setIsUploadModalOpen(true)}
             onResetModel={handleResetModel}
-            isSectionCut={isSectionCut}
-            onToggleSectionCut={handleToggleSectionCut}
-            sectionCutHeight={sectionCutHeight}
-            onChangeSectionCutHeight={setSectionCutHeight}
-            autoRotate={autoRotate}
-            onToggleAutoRotate={() => setAutoRotate(!autoRotate)}
-            isMeasuring={isMeasuring}
-            onToggleMeasuring={handleToggleMeasuring}
-            measuredDistance={measuredDistance}
-            onClearMeasurement={() => setMeasuredDistance(null)}
           />
 
           {/* Bottom Review Action & Peer Bar */}
@@ -371,12 +321,6 @@ export default function DesignWorkspacePage() {
               meshCount: customModel ? customModel.meshCount : activeModel.meshCount,
               vertexCount: customModel ? customModel.vertexCount : activeModel.vertexCount,
               materialsCount: customModel ? customModel.materialsCount : activeModel.materialsCount,
-            }}
-            selectedElement={selectedBimElement}
-            onClearSelectedElement={() => setSelectedBimElement(null)}
-            onAddAnnotationForElement={(el) => {
-              setIsAddingAnnotation(true);
-              showToast("Add Markup to Element", `Click on ${el.name} to drop pin`, "info");
             }}
           />
         )}
